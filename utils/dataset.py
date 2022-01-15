@@ -6,10 +6,10 @@ import torchaudio
 
 
 class ESC50Dataset(torch.utils.data.Dataset):
-    def __init__(self, annotations_file, audio_dir, transforms, target_sample_rate):
+    def __init__(self, annotations_file, audio_dir, transforms, target_sample_rate, device):
         self.annotations = pd.read_csv(annotations_file)
         self.audio_dir = audio_dir
-        self.transforms = transforms
+        self.transforms = transforms.to(device)
         self.target_sample_rate = target_sample_rate
         self._map_target_classes()
 
@@ -40,4 +40,5 @@ if __name__ == "__main__":
     esc50ds = ESC50Dataset(annotations_file='../data/ESC-50-master/meta/esc50.csv',
                            audio_dir='../data/ESC-50-master/audio/',
                            transforms=mel_spectrogram,
-                           target_sample_rate=16000)
+                           target_sample_rate=16000,
+                           device='cuda')
