@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from sklearn.metrics import confusion_matrix, classification_report
 
 
-class SpectrumNetwork(pl.LightningModule):
+class AcousticAlertDetector(pl.LightningModule):
     def __init__(self, learning_rate):
         super().__init__()
 
@@ -37,7 +37,7 @@ class SpectrumNetwork(pl.LightningModule):
         return logits, preds
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
         return optimizer
 
     def training_step(self, batch, batch_idx):

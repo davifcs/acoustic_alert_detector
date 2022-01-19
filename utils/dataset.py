@@ -11,6 +11,7 @@ class ESC50Dataset(torch.utils.data.Dataset):
         self.audio_dir = audio_dir
         self.transforms = transforms.to(device)
         self.target_sample_rate = target_sample_rate
+        self.device = device
         self._map_target_classes()
 
     def __len__(self):
@@ -20,6 +21,7 @@ class ESC50Dataset(torch.utils.data.Dataset):
         audio_sample_path = os.path.join(self.audio_dir, self.annotations.filename[index])
         label = self.annotations.target[index]
         signal, sr = torchaudio.load(audio_sample_path)
+        signal = signal.to(self.device)
         if sr != self.target_sample_rate:
             signal = torchaudio.functional.resample(signal, sr, self.target_sample_rate)
         if signal.shape[0] > 1:
