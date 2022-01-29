@@ -1,0 +1,11 @@
+gpus: 1 # number of gpus
+workers: 4 # number of cpu threads
+learning_rate: 0.001 # initial learning rate
+weight_decay: 0.0005  # optimizer weight decay 5e-4
+epochs: 10
+batch_size: 16
+annotations_file: './data/ESC-50-master/meta/esc50.csv'
+audio_dir: './data/ESC-50-master/audio/'
+runs_dir : './runs/'
+target_size: 1 # target size in seconds
+target_sr: 16000 # target sample rate
