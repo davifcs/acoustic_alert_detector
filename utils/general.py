@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 
-def increment_path(path, sep='', mkdir=False):
+def increment_path(path, sep=''):
     # Increment file or directory path, i.e. runs/exp --> runs/exp{sep}2, runs/exp{sep}3, ... etc.
     path = Path(path)  # os-agnostic
     if path.exists():
@@ -14,6 +14,5 @@ def increment_path(path, sep='', mkdir=False):
         i = [int(m.groups()[0]) for m in matches if m]  # indices
         n = max(i) + 1 if i else 2  # increment number
         path = Path(f"{path}{sep}{n}{suffix}")  # increment path
-    if mkdir:
-        path.mkdir(parents=True, exist_ok=True)  # make directory
+    path.mkdir(parents=True, exist_ok=True)  # make directory
     return path

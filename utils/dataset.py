@@ -7,10 +7,12 @@ import torchaudio
 
 
 class ESC50Dataset(torch.utils.data.Dataset):
-    def __init__(self, annotations_file, audio_dir, transforms, target_sr, target_size, device):
+    def __init__(self, annotations_file, audio_dir, folds, transforms, target_sr, target_size, device):
         self.annotations = pd.read_csv(annotations_file)
+        self.annotations = self.annotations[self.annotations.fold.isin(folds)]
+        self.annotations.reset_index(drop=True, inplace=True)
         self.audio_dir = audio_dir
-        self.transforms = transforms.to(device)
+        self.transforms = transforms.to(device, non_blocking=True)
         self.target_sr = target_sr
         self.target_size = target_size * target_sr
         self.device = device
@@ -23,7 +25,7 @@ class ESC50Dataset(torch.utils.data.Dataset):
         audio_sample_path = os.path.join(self.audio_dir, self.annotations.filename[index])
         label = self.annotations.target[index]
         signal, sr = torchaudio.load(audio_sample_path)
-        signal = signal.to(self.device)
+        signal = signal.to(self.device, non_blocking=True)
         if sr != self.target_sr:
             signal = torchaudio.functional.resample(signal, sr, self.target_sr)
         if signal.shape[0] > 1:
