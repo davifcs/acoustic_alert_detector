@@ -1,12 +1,14 @@
 import os
 import random
 
+import numpy as np
 import torch
+from torch.utils.data import Dataset, WeightedRandomSampler
 import pandas as pd
 import torchaudio
 
 
-class ESC50Dataset(torch.utils.data.Dataset):
+class ESC50Dataset(Dataset):
     def __init__(self, annotations_file, audio_dir, folds, transforms, target_sr, target_size, device):
         self.annotations = pd.read_csv(annotations_file)
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
@@ -42,6 +44,12 @@ class ESC50Dataset(torch.utils.data.Dataset):
     def _random_crop(self, signal):
         start = random.randint(0, signal.shape[1] - self.target_size)
         return signal[:, start: start + self.target_size]
+
+    def build_weighted_random_sampler(self):
+        targets_unique, counts = np.unique(self.annotations.target, return_counts=True)
+        class_weights = [sum(counts) / c for c in counts]
+        weights = [class_weights[e] for e in self.annotations.target]
+        return WeightedRandomSampler(weights, len(self.annotations.target))
 
 
 if __name__ == "__main__":
