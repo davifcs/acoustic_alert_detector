@@ -1,5 +1,6 @@
 import argparse
 import yaml
+import warnings
 
 import torch
 import torchaudio
@@ -10,6 +11,9 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from utils.general import increment_path
 from utils.dataset import ESC50Dataset, build_weighted_random_sampler
 from models.spectrum import AcousticAlertDetector
+
+
+warnings.filterwarnings("ignore", ".*Consider increasing the value of the `num_workers` argument*")
 
 
 def parse_opt():
@@ -24,14 +28,12 @@ def main(opt):
 
     save_dir = increment_path(config['runs_dir'])
 
-    with open(save_dir / 'config.yaml', 'w') as f:
-        yaml.safe_dump(config, f, sort_keys=False)
-
     gpus, workers, learning_rate, weight_decay, epochs, batch_size, annotations_file, audio_dir, train_folds, \
-    test_folds, target_size, target_sr= config['gpus'], config['workers'], config['learning_rate'], \
-                                        config['weight_decay'], config['epochs'], config['batch_size'], \
-                                        config['annotations_file'], config['audio_dir'], config['train']['folds'], \
-                                        config['test']['folds'], config['target_size'], config['target_sr']
+    test_folds, target_size, target_sr, transforms = config['gpus'], config['workers'], config['learning_rate'], \
+                                                     config['weight_decay'], config['epochs'], config['batch_size'], \
+                                                     config['annotations_file'], config['audio_dir'], \
+                                                     config['train']['folds'], config['test']['folds'], \
+                                                     config['target_size'], config['target_sr'], config['transforms']
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_avg_loss',
@@ -40,7 +42,10 @@ def main(opt):
         mode='min',
     )
 
-    transforms = torchaudio.transforms.MelSpectrogram(sample_rate=1600, n_fft=256, hop_length=128, n_mels=64)
+    transforms = torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
+                                                      n_fft=transforms['mel_spectrogram']['n_fft'],
+                                                      hop_length=transforms['mel_spectrogram']['hop_length'],
+                                                      n_mels=transforms['mel_spectrogram']['n_mels'])
 
     device = 'cuda' if gpus > 0 else 'cpu'
     dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size, device)
@@ -62,8 +67,11 @@ def main(opt):
 
     trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,
                       log_every_n_steps=len(dataset_train)/batch_size/2)
-    trainer.fit(model=model, train_dataloader=dataloader_train, val_dataloaders=dataloader_val)
+    trainer.fit(model=model, train_dataloaders=dataloader_train, val_dataloaders=dataloader_val)
     trainer.test(ckpt_path='best', test_dataloaders=dataloader_test)
+
+    with open(save_dir / 'config.yaml', 'w') as f:
+        yaml.safe_dump(config, f, sort_keys=False)
 
 
 if __name__ == "__main__":

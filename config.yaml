@@ -9,6 +9,11 @@ audio_dir: './data/ESC-50-master/audio/'
 runs_dir : './runs/exp'
 target_size: 1 # target size in seconds
 target_sr: 16000 # target sample rate
+transforms:
+  mel_spectrogram:
+    n_fft: 256
+    hop_length: 128
+    n_mels: 32
 train:
   folds:
     - 1

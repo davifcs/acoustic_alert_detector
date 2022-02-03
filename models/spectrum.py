@@ -29,7 +29,7 @@ class AcousticAlertDetector(pl.LightningModule):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(64 * 5 * 9, 1),
+            nn.Linear(64 * 3 * 9, 1),
         )
 
     def forward(self, x):
@@ -40,7 +40,8 @@ class AcousticAlertDetector(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        return optimizer
+        scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda epoch: 1.0)
+        return [optimizer], [scheduler]
 
     def training_step(self, batch, batch_idx):
         x, y = batch
