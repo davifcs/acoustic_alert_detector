@@ -45,11 +45,12 @@ class ESC50Dataset(Dataset):
         start = random.randint(0, signal.shape[1] - self.target_size)
         return signal[:, start: start + self.target_size]
 
-    def build_weighted_random_sampler(self):
-        targets_unique, counts = np.unique(self.annotations.target, return_counts=True)
-        class_weights = [sum(counts) / c for c in counts]
-        weights = [class_weights[e] for e in self.annotations.target]
-        return WeightedRandomSampler(weights, len(self.annotations.target))
+
+def build_weighted_random_sampler(targets):
+    targets_unique, counts = np.unique(targets, return_counts=True)
+    class_weights = [sum(counts) / c for c in counts]
+    weights = [class_weights[e] for e in targets]
+    return WeightedRandomSampler(weights, len(targets))
 
 
 if __name__ == "__main__":

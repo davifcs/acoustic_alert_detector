@@ -8,7 +8,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from utils.general import increment_path
-from utils.dataset import ESC50Dataset
+from utils.dataset import ESC50Dataset, build_weighted_random_sampler
 from models.spectrum import AcousticAlertDetector
 
 
@@ -48,17 +48,20 @@ def main(opt):
     train_size = int(len(dataset_train) * (1 - 0.2))
     val_size = len(dataset_train) - train_size
     dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size])
+    sampler = build_weighted_random_sampler(dataset_train.dataset.annotations.target[dataset_train.indices])
 
     dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size, device)
 
-    dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers)
+    dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, sampler=sampler, drop_last=True,
+                                  num_workers=workers)
     dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers)
     dataloader_test = DataLoader(dataset=dataset_test, batch_size=batch_size, drop_last=True, num_workers=workers)
 
     model = AcousticAlertDetector(learning_rate=learning_rate)
     model.to(device)
 
-    trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback)
+    trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,
+                      log_every_n_steps=len(dataset_train)/batch_size/2)
     trainer.fit(model=model, train_dataloader=dataloader_train, val_dataloaders=dataloader_val)
     trainer.test(ckpt_path='best', test_dataloaders=dataloader_test)
 
