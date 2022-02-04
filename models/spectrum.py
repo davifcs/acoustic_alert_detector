@@ -7,7 +7,7 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 
 class AcousticAlertDetector(pl.LightningModule):
-    def __init__(self, learning_rate):
+    def __init__(self, learning_rate=1e-3):
         super().__init__()
 
         self.learning_rate = learning_rate
