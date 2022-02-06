@@ -32,7 +32,7 @@ class AcousticAlertDetector(pl.LightningModule):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(64 * 128 * 6 * 1, 128),
+            nn.Linear(128 * 6 * 1, 128),
             nn.Dropout(p=0.5),
             nn.Linear(128, 1),
         )
