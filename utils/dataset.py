@@ -16,7 +16,7 @@ class ESC50Dataset(Dataset):
         self.audio_dir = audio_dir
         self.transforms = transforms.to(device, non_blocking=True)
         self.target_sr = target_sr
-        self.target_size = target_size * target_sr
+        self.target_size = int(target_size * target_sr)
         self.device = device
         self._map_target_classes()
 

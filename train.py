@@ -62,11 +62,11 @@ def main(opt):
     dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers)
     dataloader_test = DataLoader(dataset=dataset_test, batch_size=batch_size, drop_last=True, num_workers=workers)
 
-    model = AcousticAlertDetector(learning_rate=learning_rate)
+    model = AcousticAlertDetector(learning_rate=learning_rate, weight_decay=weight_decay)
     model.to(device)
 
     trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,
-                      log_every_n_steps=len(dataset_train)/batch_size/2)
+                      log_every_n_steps=len(dataset_train)/batch_size/4)
     trainer.fit(model=model, train_dataloaders=dataloader_train, val_dataloaders=dataloader_val)
     trainer.test(ckpt_path='best', test_dataloaders=dataloader_test)
 
