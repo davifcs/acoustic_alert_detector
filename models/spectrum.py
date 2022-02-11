@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torchvision.ops.focal_loss import sigmoid_focal_loss
 from torchmetrics.functional import f1_score
 import pytorch_lightning as pl
 
@@ -12,29 +13,32 @@ class AcousticAlertDetector(pl.LightningModule):
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
-        self.criterion = torch.nn.BCEWithLogitsLoss()
+        self.criterion = nn.CrossEntropyLoss()
 
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
             nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
             nn.Dropout(p=0.2),
-
+            nn.Conv2d(in_channels=256, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
+            nn.AvgPool2d(kernel_size=(2, 1), stride=(2, 1))
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * 6 * 1, 128),
-            nn.Dropout(p=0.5),
-            nn.Linear(128, 1),
+            nn.Linear(2 * 2 * 12, 2),
         )
 
     def forward(self, x):
@@ -51,14 +55,16 @@ class AcousticAlertDetector(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self.linear(self.conv(x)).squeeze()
-        loss = self.criterion(logits, y.float())
+        loss = self.criterion(logits, y)
+        self.log('train_loss', loss.item(), prog_bar=True)
+
         return loss
 
     def evaluate(self, batch, stage=None):
         x, y = batch
         logits, preds = self.forward(x)
-        loss = self.criterion(logits, y.float())
-        f1 = f1_score(preds, y, average='weighted', num_classes=2)
+        loss = self.criterion(logits, y)
+        f1 = f1_score(preds, y, average='macro', num_classes=2)
 
         self.log(f'{stage}_loss', loss.item(), prog_bar=True)
         self.log(f'{stage}_f1', f1.item(), prog_bar=True)
@@ -78,8 +84,8 @@ class AcousticAlertDetector(pl.LightningModule):
         self.log('val_avg_f1', avg_f1.item(), prog_bar=True)
 
     def test_epoch_end(self, outputs):
-        avg_loss = torch.stack([output['test_avg_loss'] for output in outputs]).mean()
-        avg_f1 = torch.stack([output['test_avg_f1'] for output in outputs]).float().mean()
+        avg_loss = torch.stack([output['test_loss'] for output in outputs]).mean()
+        avg_f1 = torch.stack([output['test_f1'] for output in outputs]).float().mean()
         preds = torch.cat([output['predictions'] for output in outputs]).float()
         labels = torch.cat([output['label'] for output in outputs]).float()
 
