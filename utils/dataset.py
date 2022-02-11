@@ -7,6 +7,8 @@ from torch.utils.data import Dataset, WeightedRandomSampler
 import pandas as pd
 import torchaudio
 
+import soundfile as sf
+
 
 class ESC50Dataset(Dataset):
     def __init__(self, annotations_file, audio_dir, folds, transforms, target_sr, target_size, device):
@@ -32,18 +34,27 @@ class ESC50Dataset(Dataset):
             signal = torchaudio.functional.resample(signal, sr, self.target_sr)
         if signal.shape[0] > 1:
             signal = torch.mean(signal, dim=0, keepdim=True)
-        signal = self._random_crop(signal)
+        signal = self._random_crop(signal, label)
+        # if label:
+        #     sf.write(file='./pos_samples/'+str(index)+'.wav', data=np.squeeze(signal.cpu().numpy()),
+        #              samplerate=self.target_sr, format='WAV')
         signal = self.transforms(signal)
         return signal, label
 
     def _map_target_classes(self):
-        map_class_to_id = {'car_horn': 1, 'siren': 1}
+        map_class_to_id = {'siren': 1}
         self.annotations.target = self.annotations.category.apply(
             lambda name: map_class_to_id[name] if name in map_class_to_id.keys() else 0)
 
-    def _random_crop(self, signal):
-        start = random.randint(0, signal.shape[1] - self.target_size)
-        return signal[:, start: start + self.target_size]
+    def _random_crop(self, signal, label):
+        cropped_rms = 0
+        while cropped_rms < 0.01:
+            start = random.randint(0, signal.shape[1] - self.target_size)
+            cropped_signal = signal[:, start: start + self.target_size]
+            cropped_rms = torch.sqrt(torch.mean(cropped_signal ** 2))
+            if label == 0:
+                break
+        return cropped_signal
 
 
 def build_weighted_random_sampler(targets):
