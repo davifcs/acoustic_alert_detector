@@ -45,7 +45,8 @@ def main(opt):
     transforms = torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
                                                       n_fft=transforms['mel_spectrogram']['n_fft'],
                                                       hop_length=transforms['mel_spectrogram']['hop_length'],
-                                                      n_mels=transforms['mel_spectrogram']['n_mels'])
+                                                      n_mels=transforms['mel_spectrogram']['n_mels'],
+                                                      power=transforms['mel_spectrogram']['power'])
 
     device = 'cuda' if gpus > 0 else 'cpu'
     dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size, device)
