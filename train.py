@@ -5,13 +5,20 @@ import warnings
 import torch
 import torchaudio
 from torch.utils.data import DataLoader
-from pytorch_lightning import Trainer
+from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from utils.general import increment_path
 from utils.dataset import ESC50Dataset, build_weighted_random_sampler
 from models.spectrum import AcousticAlertDetector
 
+SEED = 42
+seed_everything(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(SEED)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 warnings.filterwarnings("ignore", ".*Consider increasing the value of the `num_workers` argument*")
 
@@ -38,7 +45,7 @@ def main(opt):
     checkpoint_callback = ModelCheckpoint(
         monitor='val_avg_loss',
         dirpath=save_dir,
-        filename="{epoch:02d}-{val_avg_loss:.2f}-{val_avg_accuracy:.2f}",
+        filename="{epoch:02d}-{val_avg_loss:.2f}-{val_avg_f1:.2f}",
         mode='min',
     )
 
@@ -53,7 +60,8 @@ def main(opt):
 
     train_size = int(len(dataset_train) * (1 - 0.2))
     val_size = len(dataset_train) - train_size
-    dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size])
+    dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size],
+                                                               generator=torch.Generator().manual_seed(42))
     sampler = build_weighted_random_sampler(dataset_train.dataset.annotations.target[dataset_train.indices])
 
     dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size, device)

@@ -9,6 +9,9 @@ import torchaudio
 
 import soundfile as sf
 
+SEED = 42
+random.seed(SEED)
+
 
 class ESC50Dataset(Dataset):
     def __init__(self, annotations_file, audio_dir, folds, transforms, target_sr, target_size, device):
