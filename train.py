@@ -1,6 +1,7 @@
 import argparse
 import yaml
 import warnings
+from pathlib import Path
 
 import torch
 import torchaudio
@@ -35,6 +36,9 @@ def main(opt):
 
     save_dir = increment_path(config['runs_dir'])
 
+    with open(save_dir / 'config.yaml', 'w') as f:
+        yaml.safe_dump(config, f, sort_keys=False)
+
     gpus, workers, learning_rate, weight_decay, epochs, batch_size, annotations_file, audio_dir, train_folds, \
     test_folds, target_size, target_sr, transforms = config['gpus'], config['workers'], config['learning_rate'], \
                                                      config['weight_decay'], config['epochs'], config['batch_size'], \
@@ -44,12 +48,13 @@ def main(opt):
 
     checkpoint_callback = ModelCheckpoint(
         monitor='val_avg_loss',
-        dirpath=save_dir,
+        dirpath=Path(f"{save_dir}/trained_models"),
         filename="{epoch:02d}-{val_avg_loss:.2f}-{val_avg_f1:.2f}",
         mode='min',
     )
 
     transforms = torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
+                                                      f_min=0,
                                                       n_fft=transforms['mel_spectrogram']['n_fft'],
                                                       hop_length=transforms['mel_spectrogram']['hop_length'],
                                                       n_mels=transforms['mel_spectrogram']['n_mels'],
@@ -78,9 +83,6 @@ def main(opt):
                       log_every_n_steps=len(dataset_train)/batch_size/4)
     trainer.fit(model=model, train_dataloaders=dataloader_train, val_dataloaders=dataloader_val)
     trainer.test(ckpt_path='best', test_dataloaders=dataloader_test)
-
-    with open(save_dir / 'config.yaml', 'w') as f:
-        yaml.safe_dump(config, f, sort_keys=False)
 
 
 if __name__ == "__main__":
