@@ -2,19 +2,22 @@ gpus: 1 # number of gpus
 workers: 0 # number of cpu threads
 learning_rate: 0.001 # initial learning rate
 weight_decay: 0.005  # optimizer weight decay
-epochs: 50
+epochs: 100
 batch_size: 32
 annotations_file: './data/ESC-50-master/meta/esc50.csv'
 audio_dir: './data/ESC-50-master/audio/'
 runs_dir : './runs/exp'
 target_size: 1 # target size in seconds
-target_sr: 22050 # target sample rate
+target_sr: 14700 # target sample rate
 transforms:
   mel_spectrogram:
-    n_fft: 2048
-    hop_length: 1024
-    n_mels: 32
-    power: 1 # energy
+    n_fft: 1024
+    hop_length: 512
+    n_mels: 30
+    power: 2 # power
+    center: False
+    normalized: False,
+    mel_scale: "slaney"
 train:
   folds:
     - 1

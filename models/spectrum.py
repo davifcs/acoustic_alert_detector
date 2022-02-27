@@ -13,7 +13,7 @@ class AcousticAlertDetector( LightningModule):
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
-        self.criterion = nn.BCEWithLogitsLoss()
+        self.criterion = sigmoid_focal_loss
 
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
@@ -33,7 +33,7 @@ class AcousticAlertDetector( LightningModule):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(2 * 2 * 1, 1),
+            nn.Linear(2 * 1 * 2, 1),
         )
 
     def forward(self, x):
@@ -50,7 +50,7 @@ class AcousticAlertDetector( LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self.linear(self.conv(x)).squeeze()
-        loss = self.criterion(logits.float(), y.float())
+        loss = self.criterion(logits.float(), y.float(), reduction='mean')
         self.log('train_loss', loss.item(), prog_bar=True)
 
         return loss
@@ -58,7 +58,7 @@ class AcousticAlertDetector( LightningModule):
     def evaluate(self, batch, stage=None):
         x, y = batch
         logits, preds = self.forward(x)
-        loss = self.criterion(logits.float(), y.float())
+        loss = self.criterion(logits.squeeze().float(), y.float(), reduction='mean')
         f1 = f1_score(preds, y, average='macro', num_classes=2)
 
         self.log(f'{stage}_loss', loss.item(), prog_bar=True)

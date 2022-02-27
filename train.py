@@ -53,12 +53,17 @@ def main(opt):
         mode='min',
     )
 
-    transforms = torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
+    transforms = [torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
                                                       f_min=0,
                                                       n_fft=transforms['mel_spectrogram']['n_fft'],
+                                                      win_length=transforms['mel_spectrogram']['n_fft'],
                                                       hop_length=transforms['mel_spectrogram']['hop_length'],
+                                                      center=transforms['mel_spectrogram']['center'],
+                                                      normalized=transforms['mel_spectrogram']['normalized'],
+                                                      mel_scale="slaney",
                                                       n_mels=transforms['mel_spectrogram']['n_mels'],
-                                                      power=transforms['mel_spectrogram']['power'])
+                                                      power=transforms['mel_spectrogram']['power']),
+                  torchaudio.transforms.AmplitudeToDB(top_db=80.0)]
 
     device = 'cuda' if gpus > 0 else 'cpu'
     dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size, device)

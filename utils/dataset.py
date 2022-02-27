@@ -19,7 +19,7 @@ class ESC50Dataset(Dataset):
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
         self.annotations.reset_index(drop=True, inplace=True)
         self.audio_dir = audio_dir
-        self.transforms = transforms.to(device, non_blocking=True)
+        self.transforms = [transform.to(device, non_blocking=True) for transform in transforms]
         self.target_sr = target_sr
         self.target_size = int(target_size * target_sr)
         self.device = device
@@ -41,7 +41,8 @@ class ESC50Dataset(Dataset):
         # if label:
         #     sf.write(file='./pos_samples/'+str(index)+'.wav', data=np.squeeze(signal.cpu().numpy()),
         #              samplerate=self.target_sr, format='WAV')
-        signal = self.transforms(signal)
+        for transform in self.transforms:
+            signal = transform(signal)
         return signal, label
 
     def _map_target_classes(self):
