@@ -7,7 +7,7 @@ from pytorch_lightning import LightningModule
 from sklearn.metrics import confusion_matrix, classification_report
 
 
-class AcousticAlertDetector( LightningModule):
+class CNN(LightningModule):
     def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
         super().__init__()
 
@@ -50,15 +50,14 @@ class AcousticAlertDetector( LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self.linear(self.conv(x)).squeeze()
-        loss = self.criterion(logits.float(), y.float(), reduction='mean')
+        loss = self.criterion(logits.squeeze().float(), y.squeeze().float(), reduction='mean')
         self.log('train_loss', loss.item(), prog_bar=True)
-
         return loss
 
     def evaluate(self, batch, stage=None):
         x, y = batch
         logits, preds = self.forward(x)
-        loss = self.criterion(logits.squeeze().float(), y.float(), reduction='mean')
+        loss = self.criterion(logits.squeeze().float(), y.squeeze().float(), reduction='mean')
         f1 = f1_score(preds, y, average='macro', num_classes=2)
 
         self.log(f'{stage}_loss', loss.item(), prog_bar=True)

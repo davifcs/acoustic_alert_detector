@@ -11,7 +11,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from utils.general import increment_path
 from utils.dataset import ESC50Dataset, build_weighted_random_sampler
-from models.spectrum import AcousticAlertDetector
+from models.convolutional import CNN
+from models.transformer import ViT
 
 SEED = 42
 seed_everything(SEED)
@@ -39,34 +40,52 @@ def main(opt):
     with open(save_dir / 'config.yaml', 'w') as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
-    gpus, workers, learning_rate, weight_decay, epochs, batch_size, annotations_file, audio_dir, train_folds, \
-    test_folds, target_size, target_sr, transforms = config['gpus'], config['workers'], config['learning_rate'], \
-                                                     config['weight_decay'], config['epochs'], config['batch_size'], \
-                                                     config['annotations_file'], config['audio_dir'], \
-                                                     config['train']['folds'], config['test']['folds'], \
-                                                     config['target_size'], config['target_sr'], config['transforms']
+    gpus, workers, model, patch_size, learning_rate, weight_decay, epochs, batch_size, annotations_file, audio_dir, \
+    train_folds, test_folds, target_size, target_sr, transforms = config['gpus'], config['workers'], config['model'],\
+                                                                  config['patch_size'], config['learning_rate'], \
+                                                                  config['weight_decay'], config['epochs'],\
+                                                                  config['batch_size'], config['annotations_file'],\
+                                                                  config['audio_dir'], config['train']['folds'], \
+                                                                  config['test']['folds'], config['target_size'], \
+                                                                  config['target_sr'], config['transforms']
 
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_avg_loss',
+        monitor='val_loss',
         dirpath=Path(f"{save_dir}/trained_models"),
         filename="{epoch:02d}-{val_avg_loss:.2f}-{val_avg_f1:.2f}",
         mode='min',
     )
 
-    transforms = [torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
-                                                      f_min=0,
-                                                      n_fft=transforms['mel_spectrogram']['n_fft'],
-                                                      win_length=transforms['mel_spectrogram']['n_fft'],
-                                                      hop_length=transforms['mel_spectrogram']['hop_length'],
-                                                      center=transforms['mel_spectrogram']['center'],
-                                                      normalized=transforms['mel_spectrogram']['normalized'],
-                                                      mel_scale="slaney",
-                                                      n_mels=transforms['mel_spectrogram']['n_mels'],
-                                                      power=transforms['mel_spectrogram']['power']),
-                  torchaudio.transforms.AmplitudeToDB(top_db=80.0)]
+    if transforms['type'] == "mel_spectrogram":
+        transforms = [torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
+                                                          f_min=0,
+                                                          n_fft=transforms['mel_spectrogram']['n_fft'],
+                                                          win_length=transforms['mel_spectrogram']['n_fft'],
+                                                          hop_length=transforms['mel_spectrogram']['hop_length'],
+                                                          center=transforms['mel_spectrogram']['center'],
+                                                          normalized=transforms['mel_spectrogram']['normalized'],
+                                                          mel_scale="slaney",
+                                                          n_mels=transforms['mel_spectrogram']['n_mels'],
+                                                          power=transforms['mel_spectrogram']['power']),
+                      torchaudio.transforms.AmplitudeToDB(top_db=80.0)]
+
+    elif transforms['type'] == "mfcc":
+        transforms = [torchaudio.transforms.MFCC(sample_rate=target_sr, n_mfcc=transforms["mfcc"]["n_mfcc"],
+                                                 dct_type=transforms["mfcc"]["dct_type"],
+                                                 norm=transforms["mfcc"]["norm"],
+                                                 melkwargs={"f_min": 0,
+                                                            "n_fft": transforms['mel_spectrogram']['n_fft'],
+                                                            "win_length": transforms['mel_spectrogram']['n_fft'],
+                                                            "hop_length": transforms['mel_spectrogram']['hop_length'],
+                                                            "center": transforms['mel_spectrogram']['center'],
+                                                            "normalized": transforms['mel_spectrogram']['normalized'],
+                                                            "mel_scale": "slaney",
+                                                            "n_mels": transforms['mel_spectrogram']['n_mels'],
+                                                            "power": transforms['mel_spectrogram']['power']})]
 
     device = 'cuda' if gpus > 0 else 'cpu'
-    dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size, device)
+    dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size, model,
+                                 patch_size, device)
 
     train_size = int(len(dataset_train) * (1 - 0.2))
     val_size = len(dataset_train) - train_size
@@ -74,14 +93,17 @@ def main(opt):
                                                                generator=torch.Generator().manual_seed(42))
     sampler = build_weighted_random_sampler(dataset_train.dataset.annotations.target[dataset_train.indices])
 
-    dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size, device)
+    dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size, model,
+                                patch_size, device)
 
-    dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, sampler=sampler, drop_last=True,
+    dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, sampler=sampler, drop_last=True,
                                   num_workers=workers)
-    dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers)
-    dataloader_test = DataLoader(dataset=dataset_test, batch_size=batch_size, drop_last=True, num_workers=workers)
+    dataloader_val = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
+    dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, drop_last=True, num_workers=workers)
 
-    model = AcousticAlertDetector(learning_rate=learning_rate, weight_decay=weight_decay)
+    # model = CNN(learning_rate=learning_rate, weight_decay=weight_decay)
+    model = ViT(embed_dim=16, hidden_dim=16, num_heads=2, patch_size=4, num_channels=1,
+                num_patches=64, num_classes=2, dropout=0.2, lr=1e-3)
     model.to(device)
 
     trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,

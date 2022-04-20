@@ -14,7 +14,7 @@ random.seed(SEED)
 
 
 class ESC50Dataset(Dataset):
-    def __init__(self, annotations_file, audio_dir, folds, transforms, target_sr, target_size, device):
+    def __init__(self, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model, patch_size, device):
         self.annotations = pd.read_csv(annotations_file)
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
         self.annotations.reset_index(drop=True, inplace=True)
@@ -22,6 +22,8 @@ class ESC50Dataset(Dataset):
         self.transforms = [transform.to(device, non_blocking=True) for transform in transforms]
         self.target_sr = target_sr
         self.target_size = int(target_size * target_sr)
+        self.model = model
+        self.patch_size = patch_size
         self.device = device
         self._map_target_classes()
 
@@ -43,6 +45,8 @@ class ESC50Dataset(Dataset):
         #              samplerate=self.target_sr, format='WAV')
         for transform in self.transforms:
             signal = transform(signal)
+        if self.model == 'transformer':
+            signal = self._img_to_patch(signal, self.patch_size)
         return signal, label
 
     def _map_target_classes(self):
@@ -59,6 +63,15 @@ class ESC50Dataset(Dataset):
             if label == 0:
                 break
         return cropped_signal
+
+    def _img_to_patch(self, signal, patch_size):
+        b, h, w = signal.shape
+
+        signal = signal.reshape(h // patch_size, patch_size, w // patch_size, patch_size)
+        signal = signal.permute(0, 2, 1, 3)  # [h', w', p_h, p_w]
+        signal = signal.flatten(0, 1)  # [h'*w', c, p_h, p_w]
+        signal = signal.flatten(1, 2)  # [h'*w', c*p_h*p_h]
+        return signal
 
 
 def build_weighted_random_sampler(targets):
