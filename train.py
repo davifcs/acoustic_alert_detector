@@ -84,8 +84,8 @@ def main(opt):
                                                             "power": transforms['mel_spectrogram']['power']})]
 
     device = 'cuda' if gpus > 0 else 'cpu'
-    dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size, model,
-                                 patch_size, device)
+    dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size,
+                                 model['type'], patch_size, device)
 
     train_size = int(len(dataset_train) * (1 - 0.2))
     val_size = len(dataset_train) - train_size
@@ -93,17 +93,22 @@ def main(opt):
                                                                generator=torch.Generator().manual_seed(42))
     sampler = build_weighted_random_sampler(dataset_train.dataset.annotations.target[dataset_train.indices])
 
-    dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size, model,
-                                patch_size, device)
+    dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size,
+                                model['type'], patch_size, device)
 
     dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, sampler=sampler, drop_last=True,
                                   num_workers=workers)
     dataloader_val = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
     dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, drop_last=True, num_workers=workers)
 
-    # model = CNN(learning_rate=learning_rate, weight_decay=weight_decay)
-    model = ViT(embed_dim=16, hidden_dim=16, num_heads=2, patch_size=4, num_channels=1,
-                num_patches=64, num_classes=2, dropout=0.2, lr=1e-3)
+    if model['type'] == 'convolutional':
+        model = CNN(learning_rate=learning_rate, weight_decay=weight_decay)
+    elif model['type'] == 'transformer':
+        model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],
+                    num_heads=model['transformer']['num_heads'], patch_size=model['transformer']['patch_size'],
+                    num_channels=model['transformer']['num_channels'], num_patches=model['transformer']['num_patches'],
+                    num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
+                    learning_rate=learning_rate)
     model.to(device)
 
     trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,

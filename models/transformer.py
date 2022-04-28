@@ -10,7 +10,7 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 class ViT(LightningModule):
     def __init__(self, embed_dim, hidden_dim, num_channels, num_heads, num_classes, patch_size,
-                 num_patches, dropout, lr):
+                 num_patches, dropout, learning_rate):
         super().__init__()
 
         # Input
@@ -38,7 +38,7 @@ class ViT(LightningModule):
         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
         self.pos_embedding = nn.Parameter(torch.randn(1, 1 + num_patches, embed_dim))
 
-        self.lr = lr
+        self.learning_rate = learning_rate
 
     def forward(self, x):
         x = self.input_layer(x)
@@ -58,11 +58,11 @@ class ViT(LightningModule):
         # Perform classification prediction
         cls = x[0]
         logits = self.mlp_head(cls)
-        preds = F.softmax(logits)
+        preds = F.softmax(logits).argmax(dim=1)
         return logits, preds
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), lr=self.lr)
+        optimizer = optim.AdamW(self.parameters(), lr=self.learning_rate)
         lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
         return [optimizer], [lr_scheduler]
 

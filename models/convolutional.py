@@ -33,7 +33,7 @@ class CNN(LightningModule):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(2 * 1 * 2, 1),
+            nn.Linear(2 * 2 * 1, 1),
         )
 
     def forward(self, x):
