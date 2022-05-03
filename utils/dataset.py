@@ -19,7 +19,10 @@ class ESC50Dataset(Dataset):
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
         self.annotations.reset_index(drop=True, inplace=True)
         self.audio_dir = audio_dir
-        self.transforms = [transform.to(device, non_blocking=True) for transform in transforms]
+        if transforms:
+            self.transforms = [transform.to(device, non_blocking=True) for transform in transforms]
+        else:
+            self.transforms = transforms
         self.target_sr = target_sr
         self.target_size = int(target_size * target_sr)
         self.model = model
@@ -39,12 +42,12 @@ class ESC50Dataset(Dataset):
             signal = torchaudio.functional.resample(signal, sr, self.target_sr)
         if signal.shape[0] > 1:
             signal = torch.mean(signal, dim=0, keepdim=True)
-        signal = self._random_crop(signal, label)
-        # if label:
-        #     sf.write(file='./pos_samples/'+str(index)+'.wav', data=np.squeeze(signal.cpu().numpy()),
-        #              samplerate=self.target_sr, format='WAV')
-        for transform in self.transforms:
-            signal = transform(signal)
+        signal = self._random_crop(signal, label)        # if label:
+        # sf.write(file='./pos_samples/'+str(index)+'.wav', data=np.squeeze(signal.cpu().numpy()),
+        #          samplerate=self.target_sr, format='WAV')
+        if self.transforms:
+            for transform in self.transforms:
+                signal = transform(signal)
         if self.model == 'transformer':
             signal = self._img_to_patch(signal, self.patch_size)
         return signal, label

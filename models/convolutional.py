@@ -8,39 +8,11 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 
 class CNN(LightningModule):
-    def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
+    def __init__(self, learning_rate, weight_decay):
         super().__init__()
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
-        self.criterion = sigmoid_focal_loss
-
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Dropout(p=0.2),
-            nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
-            nn.AvgPool2d(kernel_size=(2, 1), stride=(2, 1))
-        )
-        self.linear = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(2 * 2 * 1, 1),
-        )
-
-    def forward(self, x):
-        x = self.conv(x)
-        logits = self.linear(x)
-        preds = torch.sigmoid(logits) > 0.5
-        return logits, preds
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
@@ -49,15 +21,16 @@ class CNN(LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        logits = self.linear(self.conv(x)).squeeze()
-        loss = self.criterion(logits.squeeze().float(), y.squeeze().float(), reduction='mean')
+        logits = self.forward(x)
+        loss = self.criterion(logits.squeeze().float(), y.squeeze().float())
         self.log('train_loss', loss.item(), prog_bar=True)
         return loss
 
     def evaluate(self, batch, stage=None):
         x, y = batch
-        logits, preds = self.forward(x)
-        loss = self.criterion(logits.squeeze().float(), y.squeeze().float(), reduction='mean')
+        logits = self.forward(x)
+        preds = torch.sigmoid(logits) > 0.5
+        loss = self.criterion(logits.squeeze().float(), y.squeeze().float())
         f1 = f1_score(preds, y, average='macro', num_classes=2)
 
         self.log(f'{stage}_loss', loss.item(), prog_bar=True)
@@ -90,3 +63,79 @@ class CNN(LightningModule):
         print('Confusion Matrix \n', cm)
         self.log('test_avg_loss', avg_loss.item())
         self.log('test_avg_f1', avg_f1.item())
+
+
+class CNN2D(CNN):
+    def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
+        super().__init__(learning_rate, weight_decay)
+        self.criterion = sigmoid_focal_loss
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Dropout(p=0.2),
+            nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
+            nn.AvgPool2d(kernel_size=(2, 1), stride=(2, 1))
+        )
+        self.linear = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(2 * 2 * 1, 1),
+        )
+
+    def forward(self, x):
+        x = self.conv(x)
+        logits = self.linear(x)
+        return logits
+
+
+class CNN1D(CNN):
+    def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
+        super().__init__(learning_rate, weight_decay)
+        self.criterion = nn.BCEWithLogitsLoss()
+
+        self.conv1d = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=16, kernel_size=8, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Conv1d(in_channels=16, out_channels=32, kernel_size=8, stride=1, padding=0),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=32)
+        )
+        self.conv2d = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Dropout(p=0.2),
+            nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
+            nn.AvgPool2d(kernel_size=(6, 2), stride=(6, 2))
+        )
+        self.linear = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(2 * 1 * 2, 1),
+        )
+
+    def forward(self, x):
+        x = self.conv1d(x)
+        x = x.unsqueeze(3)
+        x = x.permute(0, 3, 2, 1)
+        x = self.conv2d(x)
+        logits = self.linear(x)
+        return logits

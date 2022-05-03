@@ -11,7 +11,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from utils.general import increment_path
 from utils.dataset import ESC50Dataset, build_weighted_random_sampler
-from models.convolutional import CNN
+from models.convolutional import CNN2D, CNN1D
 from models.transformer import ViT
 
 SEED = 42
@@ -82,6 +82,8 @@ def main(opt):
                                                             "mel_scale": "slaney",
                                                             "n_mels": transforms['mel_spectrogram']['n_mels'],
                                                             "power": transforms['mel_spectrogram']['power']})]
+    else:
+        transforms = None
 
     device = 'cuda' if gpus > 0 else 'cpu'
     dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size,
@@ -102,7 +104,10 @@ def main(opt):
     dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, drop_last=True, num_workers=workers)
 
     if model['type'] == 'convolutional':
-        model = CNN(learning_rate=learning_rate, weight_decay=weight_decay)
+        if model['cnn']['dim'] == 2:
+            model = CNN2D(learning_rate=learning_rate, weight_decay=weight_decay)
+        elif model['cnn']['dim'] == 1:
+            model = CNN1D(learning_rate=learning_rate, weight_decay=weight_decay)
     elif model['type'] == 'transformer':
         model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],
                     num_heads=model['transformer']['num_heads'], patch_size=model['transformer']['patch_size'],
