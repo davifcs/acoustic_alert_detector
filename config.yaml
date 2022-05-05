@@ -3,7 +3,7 @@ workers: 0 # number of cpu threads
 model:
   type: "convolutional"
   cnn:
-    dim: 1
+    dim: 2
   transformer:
     embed_dim: 16
     hidden_dim: 16
@@ -15,20 +15,20 @@ model:
     dropout: 0.2
 patch_size: 4 # transformer input patch size
 learning_rate: 0.01 # initial learning rate
-weight_decay: 0.05  # optimizer weight decay
+weight_decay: 0.005  # optimizer weight decay
 epochs: 100
 batch_size: 32
 annotations_file: './data/ESC-50-master/meta/esc50.csv'
 audio_dir: './data/ESC-50-master/audio/'
 runs_dir : './runs/exp'
-target_size: 0.1 # target size in seconds
+target_size: 1 # target size in seconds
 target_sr: 14700 # target sample rate
 transforms:
-  type: "None"
+  type: "mel_spectrogram"
   mel_spectrogram:
     n_fft: 1024
     hop_length: 512
-    n_mels: 32
+    n_mels: 30
     power: 2 # power
     center: False
     normalized: False,

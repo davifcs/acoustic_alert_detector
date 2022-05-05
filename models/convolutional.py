@@ -22,7 +22,7 @@ class CNN(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
-        loss = self.criterion(logits.squeeze().float(), y.squeeze().float())
+        loss = self.criterion(logits.squeeze().float(), y.squeeze().float(), reduction='mean')
         self.log('train_loss', loss.item(), prog_bar=True)
         return loss
 
@@ -30,8 +30,8 @@ class CNN(LightningModule):
         x, y = batch
         logits = self.forward(x)
         preds = torch.sigmoid(logits) > 0.5
-        loss = self.criterion(logits.squeeze().float(), y.squeeze().float())
-        f1 = f1_score(preds, y, average='macro', num_classes=2)
+        loss = self.criterion(logits.squeeze().float(), y.squeeze().float(), reduction='mean')
+        f1 = f1_score(preds, y, average='micro', num_classes=2)
 
         self.log(f'{stage}_loss', loss.item(), prog_bar=True)
         self.log(f'{stage}_f1', f1.item(), prog_bar=True)
@@ -93,7 +93,7 @@ class CNN2D(CNN):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(2 * 2 * 1, 1),
+            nn.Linear(2 * 1 * 2, 1),
         )
 
     def forward(self, x):

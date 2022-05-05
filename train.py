@@ -98,10 +98,10 @@ def main(opt):
     dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size,
                                 model['type'], patch_size, device)
 
-    dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, sampler=sampler, drop_last=True,
+    dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, sampler=sampler, drop_last=True,
                                   num_workers=workers)
-    dataloader_val = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
-    dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, drop_last=True, num_workers=workers)
+    dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers)
+    dataloader_test = DataLoader(dataset=dataset_test, batch_size=batch_size, drop_last=True, num_workers=workers)
 
     if model['type'] == 'convolutional':
         if model['cnn']['dim'] == 2:
