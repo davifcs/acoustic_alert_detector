@@ -5,12 +5,12 @@ from pathlib import Path
 
 import torch
 import torchaudio
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 from utils.general import increment_path
-from utils.dataset import ESC50Dataset, build_weighted_random_sampler
+from utils.dataset import ESC50Dataset, AudioSetDataset
 from models.convolutional import CNN2D, CNN1D
 from models.transformer import ViT
 
@@ -86,20 +86,23 @@ def main(opt):
         transforms = None
 
     device = 'cuda' if gpus > 0 else 'cpu'
-    dataset_train = ESC50Dataset(annotations_file, audio_dir, train_folds, transforms, target_sr, target_size,
+    esc50_dataset = ESC50Dataset(annotations_file[0], audio_dir[0], train_folds, transforms, target_sr, target_size,
                                  model['type'], patch_size, device)
+
+    audioset_dataset = AudioSetDataset(annotations_file[1], audio_dir[1], transforms, target_sr, target_size,
+                                       model['type'], patch_size, device)
+
+    dataset_train = ConcatDataset([esc50_dataset, audioset_dataset])
 
     train_size = int(len(dataset_train) * (1 - 0.2))
     val_size = len(dataset_train) - train_size
     dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size],
                                                                generator=torch.Generator().manual_seed(42))
-    sampler = build_weighted_random_sampler(dataset_train.dataset.annotations.target[dataset_train.indices])
 
-    dataset_test = ESC50Dataset(annotations_file, audio_dir, test_folds, transforms, target_sr, target_size,
+    dataset_test = ESC50Dataset(annotations_file[0], audio_dir[0], test_folds, transforms, target_sr, target_size,
                                 model['type'], patch_size, device)
 
-    dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, sampler=sampler, drop_last=True,
-                                  num_workers=workers)
+    dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
     dataloader_val = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
     dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, drop_last=True, num_workers=workers)
 

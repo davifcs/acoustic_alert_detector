@@ -18,8 +18,17 @@ learning_rate: 0.01 # initial learning rate
 weight_decay: 0.05  # optimizer weight decay
 epochs: 100
 batch_size: 32
-annotations_file: './data/ESC-50-master/meta/esc50.csv'
-audio_dir: './data/ESC-50-master/audio/'
+annotations_file: ['./data/ESC-50-master/meta/esc50.csv', './data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv']
+audio_dir: ['./data/ESC-50-master/audio/', './data/AudioSet/balanced_train_segments/']
+train:
+  folds:
+    - 1
+    - 2
+    - 3
+test:
+  folds:
+    - 4
+    - 5
 runs_dir : './runs/exp'
 target_size: 0.1 # target size in seconds
 target_sr: 14700 # target sample rate
@@ -37,12 +46,3 @@ transforms:
     n_mfcc: 30
     dct_type: 2
     norm: 'ortho'
-train:
-  folds:
-    - 1
-    - 2
-    - 3
-test:
-  folds:
-    - 4
-    - 5
