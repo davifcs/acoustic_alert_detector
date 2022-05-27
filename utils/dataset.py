@@ -78,7 +78,7 @@ class ESC50Dataset(BaseDataset):
         return signal, label
 
     def _map_target_classes(self):
-        map_class_to_id = {'siren': 1, 'car_horn': 2}
+        map_class_to_id = {'siren': 1}
         self.annotations.target = self.annotations.category.apply(
             lambda name: map_class_to_id[name] if name in map_class_to_id.keys() else 0)
 
