@@ -6,11 +6,12 @@ from pathlib import Path
 import torch
 import torchaudio
 from torch.utils.data import DataLoader, ConcatDataset
-from pytorch_lightning import Trainer, seed_everything
+from pytorch_lightning import Trainer, seed_everything, loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
+
 from utils.general import increment_path
-from utils.dataset import ESC50Dataset, AudioSetDataset
+from utils.dataset import ESC50, UrbanSound8K, AudioSet
 from models.convolutional import CNN2D, CNN1D
 from models.transformer import ViT
 
@@ -40,21 +41,10 @@ def main(opt):
     with open(save_dir / 'config.yaml', 'w') as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
-    gpus, workers, model, learning_rate, weight_decay, epochs, batch_size, annotations_file, audio_dir, \
-    train_folds, test_folds, target_size, target_sr, transforms = config['gpus'], config['workers'], config['model'],\
-                                                                  config['learning_rate'], \
-                                                                  config['weight_decay'], config['epochs'],\
-                                                                  config['batch_size'], config['annotations_file'],\
-                                                                  config['audio_dir'], config['train']['folds'], \
-                                                                  config['test']['folds'], config['target_size'], \
-                                                                  config['target_sr'], config['transforms']
-
-    checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss',
-        dirpath=Path(f"{save_dir}/trained_models"),
-        filename="{epoch:02d}-{val_loss:.4f}",
-        mode='min',
-    )
+    gpus, workers, model, learning_rate, weight_decay, epochs, batch_size, datasets, target_size, target_sr, \
+    transforms = config['gpus'], config['workers'], config['model'], config['learning_rate'], config['weight_decay'], \
+                 config['epochs'], config['batch_size'], config['datasets'], config['target_size'], \
+                 config['target_sr'], config['transforms']
 
     if transforms['type'] == "mel_spectrogram":
         transforms = [torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
@@ -86,45 +76,74 @@ def main(opt):
         transforms = None
 
     device = 'cuda' if gpus > 0 else 'cpu'
-    esc50_dataset = ESC50Dataset(annotations_file[0], audio_dir[0], train_folds, transforms, target_sr, target_size,
-                                 model['type'], model['transformer']['patch_size'], device)
 
-    audioset_dataset = AudioSetDataset(annotations_file[1], audio_dir[1], transforms, target_sr, target_size,
-                                       model['type'], model['transformer']['patch_size'], device)
+    audioset_dataset = AudioSet(datasets['audioset']['annotations_file'], datasets['audioset']['audio_dir'],
+                                transforms, target_sr, target_size, model['type'],
+                                model['transformer']['patch_size'], device)
 
-    dataset_train = ConcatDataset([esc50_dataset, audioset_dataset])
+    for fold in datasets[datasets['support']]['folds']:
+        log_path = f"{save_dir}/{datasets['support']}-{fold}/"
 
-    train_size = int(len(dataset_train) * (1 - 0.2))
-    val_size = len(dataset_train) - train_size
-    dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size],
-                                                               generator=torch.Generator().manual_seed(42))
+        checkpoint_callback = ModelCheckpoint(
+            monitor='val_loss',
+            dirpath=f"{log_path}/trained_models",
+            filename="{epoch:02d}-{val_loss:.4f}",
+            mode='min',
+        )
+        tb_logger = pl_loggers.TensorBoardLogger(save_dir=log_path)
 
-    dataset_test = ESC50Dataset(annotations_file[0], audio_dir[0], test_folds, transforms, target_sr, target_size,
-                                model['type'], model['transformer']['patch_size'], device)
+        if datasets['support'] == 'esc50':
+            support_dataset_train = ESC50(datasets['esc50']['annotations_file'], datasets['esc50']['audio_dir'],
+                                          datasets['esc50']['folds'][:fold-1] + datasets['esc50']['folds'][fold:],
+                                          transforms, target_sr, target_size,
+                                          model['type'], model['transformer']['patch_size'], device)
+            dataset_test = ESC50(datasets['esc50']['annotations_file'], datasets['esc50']['audio_dir'],
+                                         [fold], transforms, target_sr, target_size,
+                                         model['type'], model['transformer']['patch_size'], device)
+        elif datasets['support'] == 'urbansound8k':
+            support_dataset_train = UrbanSound8K(datasets['urbansound8k']['annotations_file'],
+                                                 datasets['urbansound8k']['audio_dir'],
+                                                 datasets['urbansound8k']['folds'][:fold-1] +
+                                                 datasets['urbansound8k']['folds'][fold:],
+                                                 transforms, target_sr, target_size, model['type'],
+                                                 model['transformer']['patch_size'], device)
+            dataset_test = UrbanSound8K(datasets['urbansound8k']['annotations_file'],
+                                                 datasets['urbansound8k']['audio_dir'],
+                                                 [fold],
+                                                 transforms, target_sr, target_size, model['type'],
+                                                 model['transformer']['patch_size'], device)
 
-    dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
-    dataloader_val = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
-    dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, drop_last=True, num_workers=workers)
+        dataset_train = ConcatDataset([support_dataset_train, audioset_dataset])
 
-    if model['type'] == 'convolutional':
-        if model['cnn']['dim'] == 2:
-            model = CNN2D(learning_rate=learning_rate, weight_decay=weight_decay)
-        elif model['cnn']['dim'] == 1:
-            model = CNN1D(learning_rate=learning_rate, weight_decay=weight_decay)
-    elif model['type'] == 'transformer':
-        model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],
-                    num_heads=model['transformer']['num_heads'], patch_size=model['transformer']['patch_size'],
-                    num_channels=model['transformer']['num_channels'], num_patches=model['transformer']['num_patches'],
-                    num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
-                    learning_rate=learning_rate, weight_decay=weight_decay)
-    model.to(device)
+        train_size = int(len(dataset_train) * (1 - 0.2))
+        val_size = len(dataset_train) - train_size
+        dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size],
+                                                                   generator=torch.Generator().manual_seed(42))
 
-    trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,
-                      log_every_n_steps=len(dataset_train)/batch_size/4)
-    trainer.fit(model=model, train_dataloaders=dataloader_train, val_dataloaders=dataloader_val)
-    trainer.test(ckpt_path='best', test_dataloaders=dataloader_test)
+        dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
+        dataloader_val = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
+        dataloader_test = DataLoader(dataset=dataset_test, batch_size=1, drop_last=True, num_workers=workers)
+
+        if model['type'] == 'convolutional':
+            if model['cnn']['dim'] == 2:
+                pl_model = CNN2D(learning_rate=learning_rate, weight_decay=weight_decay, log_path=log_path)
+            elif model['cnn']['dim'] == 1:
+                pl_model = CNN1D(learning_rate=learning_rate, weight_decay=weight_decay, log_path=log_path)
+        elif model['type'] == 'transformer':
+            pl_model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],
+                        num_heads=model['transformer']['num_heads'], patch_size=model['transformer']['patch_size'],
+                        num_channels=model['transformer']['num_channels'], num_patches=model['transformer']['num_patches'],
+                        num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
+                        learning_rate=learning_rate, weight_decay=weight_decay, log_path=log_path)
+        pl_model.to(device)
+
+        trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,
+                          log_every_n_steps=len(dataset_train)/batch_size/4, logger=tb_logger)
+        trainer.fit(model=pl_model, train_dataloaders=dataloader_train, val_dataloaders=dataloader_val)
+        trainer.test(ckpt_path='best', test_dataloaders=dataloader_test)
 
 
 if __name__ == "__main__":
     _args = parse_opt()
     main(_args)
+

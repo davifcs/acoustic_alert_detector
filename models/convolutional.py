@@ -8,11 +8,12 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 
 class CNN(LightningModule):
-    def __init__(self, learning_rate, weight_decay):
+    def __init__(self, learning_rate, weight_decay, log_path):
         super().__init__()
 
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+        self.log_path = log_path
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
@@ -52,15 +53,17 @@ class CNN(LightningModule):
 
         report = classification_report(labels.cpu(), preds.cpu())
         cm = confusion_matrix(labels.cpu(), preds.cpu(), normalize='true')
-        print('\n', report)
-        print('Confusion Matrix \n', cm)
+
+        with open(self.log_path+'results.txt', 'a') as f:
+            f.write(report + '\n')
+            f.write('Confusion Matrix \n' + str(cm))
 
         self.log(f'test_f1', f1.item(), prog_bar=True)
 
 
 class CNN2D(CNN):
-    def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
-        super().__init__(learning_rate, weight_decay)
+    def __init__(self, learning_rate=1e-3, weight_decay=5e-4, log_path='./'):
+        super().__init__(learning_rate, weight_decay, log_path)
         self.criterion = nn.NLLLoss()
 
         self.conv = nn.Sequential(
@@ -94,8 +97,8 @@ class CNN2D(CNN):
 
 
 class CNN1D(CNN):
-    def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
-        super().__init__(learning_rate, weight_decay)
+    def __init__(self, learning_rate=1e-3, weight_decay=5e-4, log_path='./'):
+        super().__init__(learning_rate, weight_decay, log_path)
         self.criterion = nn.NLLLoss()
 
         self.conv1d = nn.Sequential(
