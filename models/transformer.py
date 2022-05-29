@@ -1,17 +1,18 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
+from torch import nn
+from torch.nn import functional as F
+from torchmetrics.functional import f1_score, accuracy
 from pytorch_lightning import LightningModule
-from torchmetrics.functional import f1_score
 
 from sklearn.metrics import confusion_matrix, classification_report
 
 
 class ViT(LightningModule):
     def __init__(self, embed_dim, hidden_dim, num_channels, num_heads, num_classes, patch_size,
-                 num_patches, dropout, learning_rate):
+                 num_patches, dropout, learning_rate, weight_decay):
         super().__init__()
+
+        self.weight_decay = weight_decay
 
         # Input
         self.patch_size = patch_size
@@ -58,30 +59,32 @@ class ViT(LightningModule):
         # Perform classification prediction
         cls = x[0]
         logits = self.mlp_head(cls)
-        preds = F.softmax(logits).argmax(dim=1)
-        return logits, preds
+        return F.log_softmax(logits, dim=1)
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), lr=self.learning_rate)
-        lr_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[100, 150], gamma=0.1)
-        return [optimizer], [lr_scheduler]
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+        scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda epoch: 0.95)
+        return [optimizer], [scheduler]
 
-    def training_step(self, batch):
-        imgs, labels = batch
-        logits, preds = self.forward(imgs)
-        loss = self.criterion(logits, labels)
-        self.log("train_loss", loss.item(), prog_bar=True)
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self.forward(x)
+        loss = self.criterion(logits, y)
+        self.log('train_loss', loss.item(), prog_bar=True)
         return loss
 
     def evaluate(self, batch, stage=None):
-        imgs, labels = batch
-        logits, preds = self.forward(imgs)
-        loss = self.criterion(logits, labels)
-        f1 = f1_score(preds, labels, average='macro', num_classes=2)
+        x, y = batch
+        logits = self.forward(x)
+        loss = self.criterion(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y)
 
-        self.log(f'{stage}_loss', loss.item(), prog_bar=True)
-        self.log(f'{stage}_f1', f1.item(), prog_bar=True)
-        return {f'{stage}_loss': loss, f'{stage}_f1': f1, 'predictions': preds, 'label': labels}
+        if stage:
+            self.log(f'{stage}_acc', acc.item(), prog_bar=True)
+            self.log(f'{stage}_loss', loss.item(), prog_bar=True)
+
+        return {f'{stage}_loss': loss, f'{stage}_acc': acc, 'predictions': preds, 'label': y}
 
     def validation_step(self, batch, batch_idx):
         return self.evaluate(batch, 'val')
@@ -89,23 +92,14 @@ class ViT(LightningModule):
     def test_step(self, batch, batch_idx):
         return self.evaluate(batch, 'test')
 
-    def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([output['val_loss'] for output in outputs]).mean()
-        avg_f1 = torch.stack([output['val_f1'] for output in outputs]).float().mean()
-
-        self.log('val_avg_loss', avg_loss.item(), prog_bar=True)
-        self.log('val_avg_f1', avg_f1.item(), prog_bar=True)
-
     def test_epoch_end(self, outputs):
-        avg_loss = torch.stack([output['test_loss'] for output in outputs]).mean()
-        avg_f1 = torch.stack([output['test_f1'] for output in outputs]).float().mean()
-        preds = torch.cat([output['predictions'] for output in outputs]).float()
-        labels = torch.cat([output['label'] for output in outputs]).float()
+        preds = torch.cat([output['predictions'] for output in outputs])
+        labels = torch.cat([output['label'] for output in outputs])
+        f1 = f1_score(preds, labels, average='macro', num_classes=2)
 
         report = classification_report(labels.cpu(), preds.cpu())
-        cm = confusion_matrix(labels.cpu(), preds.cpu())
-
+        cm = confusion_matrix(labels.cpu(), preds.cpu(), normalize='true')
         print('\n', report)
         print('Confusion Matrix \n', cm)
-        self.log('test_avg_loss', avg_loss.item())
-        self.log('test_avg_f1', avg_f1.item())
+
+        self.log(f'test_f1', f1.item(), prog_bar=True)

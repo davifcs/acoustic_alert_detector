@@ -40,9 +40,9 @@ def main(opt):
     with open(save_dir / 'config.yaml', 'w') as f:
         yaml.safe_dump(config, f, sort_keys=False)
 
-    gpus, workers, model, patch_size, learning_rate, weight_decay, epochs, batch_size, annotations_file, audio_dir, \
+    gpus, workers, model, learning_rate, weight_decay, epochs, batch_size, annotations_file, audio_dir, \
     train_folds, test_folds, target_size, target_sr, transforms = config['gpus'], config['workers'], config['model'],\
-                                                                  config['patch_size'], config['learning_rate'], \
+                                                                  config['learning_rate'], \
                                                                   config['weight_decay'], config['epochs'],\
                                                                   config['batch_size'], config['annotations_file'],\
                                                                   config['audio_dir'], config['train']['folds'], \
@@ -52,7 +52,7 @@ def main(opt):
     checkpoint_callback = ModelCheckpoint(
         monitor='val_loss',
         dirpath=Path(f"{save_dir}/trained_models"),
-        filename="{epoch:02d}-{val_avg_loss:.2f}-{val_avg_f1:.2f}",
+        filename="{epoch:02d}-{val_loss:.4f}",
         mode='min',
     )
 
@@ -87,10 +87,10 @@ def main(opt):
 
     device = 'cuda' if gpus > 0 else 'cpu'
     esc50_dataset = ESC50Dataset(annotations_file[0], audio_dir[0], train_folds, transforms, target_sr, target_size,
-                                 model['type'], patch_size, device)
+                                 model['type'], model['transformer']['patch_size'], device)
 
     audioset_dataset = AudioSetDataset(annotations_file[1], audio_dir[1], transforms, target_sr, target_size,
-                                       model['type'], patch_size, device)
+                                       model['type'], model['transformer']['patch_size'], device)
 
     dataset_train = ConcatDataset([esc50_dataset, audioset_dataset])
 
@@ -100,7 +100,7 @@ def main(opt):
                                                                generator=torch.Generator().manual_seed(42))
 
     dataset_test = ESC50Dataset(annotations_file[0], audio_dir[0], test_folds, transforms, target_sr, target_size,
-                                model['type'], patch_size, device)
+                                model['type'], model['transformer']['patch_size'], device)
 
     dataloader_train = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
     dataloader_val = DataLoader(dataset=dataset_train, batch_size=1, drop_last=True, num_workers=workers)
@@ -116,7 +116,7 @@ def main(opt):
                     num_heads=model['transformer']['num_heads'], patch_size=model['transformer']['patch_size'],
                     num_channels=model['transformer']['num_channels'], num_patches=model['transformer']['num_patches'],
                     num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
-                    learning_rate=learning_rate)
+                    learning_rate=learning_rate, weight_decay=weight_decay)
     model.to(device)
 
     trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,

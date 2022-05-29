@@ -1,7 +1,7 @@
 import torch
 from torch import nn
-from torchvision.ops.focal_loss import sigmoid_focal_loss
-from torchmetrics.functional import f1_score
+from torch.nn import functional as F
+from torchmetrics.functional import f1_score, accuracy
 from pytorch_lightning import LightningModule
 
 from sklearn.metrics import confusion_matrix, classification_report
@@ -22,20 +22,22 @@ class CNN(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
-        loss = self.criterion(logits.squeeze().float(), y.squeeze().float())
+        loss = self.criterion(logits, y)
         self.log('train_loss', loss.item(), prog_bar=True)
         return loss
 
     def evaluate(self, batch, stage=None):
         x, y = batch
         logits = self.forward(x)
-        preds = torch.sigmoid(logits) > 0.5
-        loss = self.criterion(logits.squeeze().float(), y.squeeze().float())
-        f1 = f1_score(preds, y, average='macro', num_classes=2)
+        loss = self.criterion(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y)
 
-        self.log(f'{stage}_loss', loss.item(), prog_bar=True)
-        self.log(f'{stage}_f1', f1.item(), prog_bar=True)
-        return {f'{stage}_loss': loss, f'{stage}_f1': f1, 'predictions': preds, 'label': y}
+        if stage:
+            self.log(f'{stage}_acc', acc.item(), prog_bar=True)
+            self.log(f'{stage}_loss', loss.item(), prog_bar=True)
+
+        return {f'{stage}_loss': loss, f'{stage}_acc': acc, 'predictions': preds, 'label': y}
 
     def validation_step(self, batch, batch_idx):
         return self.evaluate(batch, 'val')
@@ -43,69 +45,58 @@ class CNN(LightningModule):
     def test_step(self, batch, batch_idx):
         return self.evaluate(batch, 'test')
 
-    def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([output['val_loss'] for output in outputs]).mean()
-        avg_f1 = torch.stack([output['val_f1'] for output in outputs]).float().mean()
-
-        self.log('val_avg_loss', avg_loss.item(), prog_bar=True)
-        self.log('val_avg_f1', avg_f1.item(), prog_bar=True)
-
     def test_epoch_end(self, outputs):
-        avg_loss = torch.stack([output['test_loss'] for output in outputs]).mean()
-        avg_f1 = torch.stack([output['test_f1'] for output in outputs]).float().mean()
-        preds = torch.cat([output['predictions'] for output in outputs]).float()
-        labels = torch.cat([output['label'] for output in outputs]).float()
+        preds = torch.cat([output['predictions'] for output in outputs])
+        labels = torch.cat([output['label'] for output in outputs])
+        f1 = f1_score(preds, labels, average='macro', num_classes=2)
 
         report = classification_report(labels.cpu(), preds.cpu())
-        cm = confusion_matrix(labels.cpu(), preds.cpu())
-
+        cm = confusion_matrix(labels.cpu(), preds.cpu(), normalize='true')
         print('\n', report)
         print('Confusion Matrix \n', cm)
-        self.log('test_avg_loss', avg_loss.item())
-        self.log('test_avg_f1', avg_f1.item())
+
+        self.log(f'test_f1', f1.item(), prog_bar=True)
 
 
 class CNN2D(CNN):
     def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
         super().__init__(learning_rate, weight_decay)
-        self.criterion = sigmoid_focal_loss
+        self.criterion = nn.NLLLoss()
 
         self.conv = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-
-            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
             nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
 
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
+
             nn.MaxPool2d(kernel_size=2),
             nn.Dropout(p=0.2),
-            nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
-            nn.AvgPool2d(kernel_size=(2, 1), stride=(2, 1))
+            # nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
+            # nn.AvgPool2d(kernel_size=(2, 1), stride=(2, 1))
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(2 * 2 * 1, 1),
+            nn.Linear(32 * 13 * 12, 512),
+            nn.Linear(512, 64),
+            nn.Linear(64, 2),
         )
 
     def forward(self, x):
         x = self.conv(x)
         logits = self.linear(x)
-        return logits
+        return F.log_softmax(logits, dim=1)
 
 
 class CNN1D(CNN):
     def __init__(self, learning_rate=1e-3, weight_decay=5e-4):
         super().__init__(learning_rate, weight_decay)
-        self.criterion = nn.BCEWithLogitsLoss()
+        self.criterion = nn.NLLLoss()
 
         self.conv1d = nn.Sequential(
             nn.Conv1d(in_channels=1, out_channels=16, kernel_size=8, stride=1, padding=0),
@@ -124,12 +115,14 @@ class CNN1D(CNN):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2),
             nn.Dropout(p=0.2),
-            nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
-            nn.AvgPool2d(kernel_size=(6, 2), stride=(6, 2))
+            # nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
+            # nn.AvgPool2d(kernel_size=(6, 2), stride=(6, 2))
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(2 * 1 * 2, 1),
+            nn.Linear(64 * 83 * 5, 512),
+            nn.Linear(512, 64),
+            nn.Linear(64, 2),
         )
 
     def forward(self, x):
@@ -138,4 +131,4 @@ class CNN1D(CNN):
         x = x.permute(0, 3, 2, 1)
         x = self.conv2d(x)
         logits = self.linear(x)
-        return logits
+        return F.log_softmax(logits, dim=1)

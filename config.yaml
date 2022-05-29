@@ -3,46 +3,45 @@ workers: 0 # number of cpu threads
 model:
   type: "convolutional"
   cnn:
-    dim: 1
+    dim: 2
   transformer:
     embed_dim: 16
     hidden_dim: 16
     num_heads: 2
-    patch_size: 4
+    patch_size: 8
     num_channels: 1
-    num_patches: 56
+    num_patches: 40
     num_classes: 2
     dropout: 0.2
-patch_size: 4 # transformer input patch size
-learning_rate: 0.01 # initial learning rate
-weight_decay: 0.05  # optimizer weight decay
-epochs: 100
-batch_size: 32
-annotations_file: ['./data/ESC-50-master/meta/esc50.csv', './data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv']
-audio_dir: ['./data/ESC-50-master/audio/', './data/AudioSet/balanced_train_segments/']
+learning_rate: 0.001 # initial learning rate
+weight_decay: 0 # optimizer weight decay
+epochs: 200
+batch_size: 64
+annotations_file: ['./data/ESC-50-master/meta/esc50.csv', './data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv', './data/AudioSet/balanced_eval_segments/filtered_eval_train_segments.csv']
+audio_dir: ['./data/ESC-50-master/audio/', './data/AudioSet/balanced_train_segments/', './data/AudioSet/balanced_eval_segments/']
 train:
+  folds:
+    - 3
+    - 4
+    - 5
+test:
   folds:
     - 1
     - 2
-    - 3
-test:
-  folds:
-    - 4
-    - 5
 runs_dir : './runs/exp'
-target_size: 0.1 # target size in seconds
-target_sr: 14700 # target sample rate
+target_size: 1.5 # target size in seconds
+target_sr: 22050 # target sample rate
 transforms:
-  type: "None"
+  type: "mel_spectrogram"
   mel_spectrogram:
-    n_fft: 1024
+    n_fft: 2048
     hop_length: 512
-    n_mels: 32
+    n_mels: 64
     power: 2 # power
     center: False
     normalized: False,
     mel_scale: "slaney"
   mfcc:
-    n_mfcc: 30
+    n_mfcc: 40
     dct_type: 2
     norm: 'ortho'
