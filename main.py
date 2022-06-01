@@ -86,7 +86,7 @@ def main(opt):
 
     audioset_dataset = AudioSet(datasets['audioset']['annotations_file'], datasets['audioset']['audio_dir'],
                                 transforms, target_sr, target_size, model['type'],
-                                model['transformer']['patch_size'], device)
+                                model['transformer']['patch_size'])
 
     for fold in datasets[datasets['main']]['folds']:
         log_path = f"{save_dir}/{datasets['main']}-{fold}/"
@@ -94,22 +94,22 @@ def main(opt):
             main_dataset_train = ESC50(datasets['esc50']['annotations_file'], datasets['esc50']['audio_dir'],
                                           datasets['esc50']['folds'][:fold-1] + datasets['esc50']['folds'][fold:],
                                           transforms, target_sr, target_size,
-                                          model['type'], model['transformer']['patch_size'], device)
+                                          model['type'], model['transformer']['patch_size'])
             dataset_test = ESC50(datasets['esc50']['annotations_file'], datasets['esc50']['audio_dir'],
                                          [fold], transforms, target_sr, target_size,
-                                         model['type'], model['transformer']['patch_size'], device)
+                                         model['type'], model['transformer']['patch_size'])
         elif datasets['main'] == 'urbansound8k':
             main_dataset_train = UrbanSound8K(datasets['urbansound8k']['annotations_file'],
                                                  datasets['urbansound8k']['audio_dir'],
                                                  datasets['urbansound8k']['folds'][:fold-1] +
                                                  datasets['urbansound8k']['folds'][fold:],
                                                  transforms, target_sr, target_size, model['type'],
-                                                 model['transformer']['patch_size'], device)
+                                                 model['transformer']['patch_size'])
             dataset_test = UrbanSound8K(datasets['urbansound8k']['annotations_file'],
                                                  datasets['urbansound8k']['audio_dir'],
                                                  [fold],
                                                  transforms, target_sr, target_size, model['type'],
-                                                 model['transformer']['patch_size'], device)
+                                                 model['transformer']['patch_size'])
 
         dataset_train = ConcatDataset([main_dataset_train, audioset_dataset])
 

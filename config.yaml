@@ -15,7 +15,7 @@ model:
     dropout: 0.2
 learning_rate: 0.001 # initial learning rate
 weight_decay: 0 # optimizer weight decay
-epochs: 50
+epochs: 100
 batch_size: 64
 datasets:
   main: 'esc50'
