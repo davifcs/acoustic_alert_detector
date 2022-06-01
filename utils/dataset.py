@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset, WeightedRandomSampler
 import pandas as pd
 import torchaudio
+from torch.nn import functional as F
 
 import soundfile as sf
 
@@ -107,10 +108,8 @@ class UrbanSound8K(BaseDataset):
         if signal.shape[0] > 1:
             signal = torch.mean(signal, dim=0, keepdim=True)
         if signal.shape[1] < self.target_size:
-            pad = torch.zeros([1, self.target_size]).to(self.device, non_blocking=True)
-            pad[:, int((pad.shape[1]/2 - signal.shape[1]/2) + 0.5):int((pad.shape[1]/2 + signal.shape[1]/2) + 0.5)] \
-                = signal
-            signal = pad
+            signal = F.pad(signal, (int((self.target_size/2 - signal.shape[1]/2) + 0.5),
+                                    int((self.target_size/2 - signal.shape[1]/2) + 0.5)), "constant", 0)
         else:
             signal = self._random_crop(signal, label)
         # if label:
