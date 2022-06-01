@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch.nn import functional as F
 from torchmetrics.functional import f1_score, accuracy
 from pytorch_lightning import LightningModule
 
@@ -8,30 +7,28 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 
 class CNN(LightningModule):
-    def __init__(self, learning_rate, weight_decay, log_path):
+    def __init__(self, learning_rate, log_path):
         super().__init__()
 
         self.learning_rate = learning_rate
-        self.weight_decay = weight_decay
         self.log_path = log_path
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-        scheduler = torch.optim.lr_scheduler.MultiplicativeLR(optimizer, lr_lambda=lambda epoch: 0.95)
-        return [optimizer], [scheduler]
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+        return {'optimizer': optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_loss'}
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        logits = self.forward(x)
+        logits, preds = self.forward(x)
         loss = self.criterion(logits, y)
         self.log('train_loss', loss.item(), prog_bar=True)
         return loss
 
     def evaluate(self, batch, stage=None):
         x, y = batch
-        logits = self.forward(x)
+        logits, preds = self.forward(x)
         loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
         acc = accuracy(preds, y)
 
         if stage:
@@ -52,7 +49,7 @@ class CNN(LightningModule):
         f1 = f1_score(preds, labels, average='macro', num_classes=2)
 
         report = classification_report(labels.cpu(), preds.cpu())
-        cm = confusion_matrix(labels.cpu(), preds.cpu(), normalize='true')
+        cm = confusion_matrix(labels.cpu(), preds.cpu())
 
         with open(self.log_path+'results.txt', 'a') as f:
             f.write(report + '\n')
@@ -62,9 +59,9 @@ class CNN(LightningModule):
 
 
 class CNN2D(CNN):
-    def __init__(self, learning_rate=1e-3, weight_decay=5e-4, log_path='./'):
-        super().__init__(learning_rate, weight_decay, log_path)
-        self.criterion = nn.NLLLoss()
+    def __init__(self, learning_rate=1e-3, log_path='./'):
+        super().__init__(learning_rate, log_path)
+        self.criterion = nn.CrossEntropyLoss()
 
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
@@ -77,7 +74,6 @@ class CNN2D(CNN):
             nn.ReLU(),
             nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
             nn.ReLU(),
-
             nn.MaxPool2d(kernel_size=2),
             nn.Dropout(p=0.2),
             # nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
@@ -85,21 +81,22 @@ class CNN2D(CNN):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(32 * 13 * 12, 512),
-            nn.Linear(512, 64),
+            nn.Linear(32 * 5 * 7, 64),
+            nn.ReLU(),
             nn.Linear(64, 2),
         )
 
     def forward(self, x):
         x = self.conv(x)
         logits = self.linear(x)
-        return F.log_softmax(logits, dim=1)
+        preds = torch.argmax(logits, dim=1)
+        return logits, preds
 
 
 class CNN1D(CNN):
-    def __init__(self, learning_rate=1e-3, weight_decay=5e-4, log_path='./'):
-        super().__init__(learning_rate, weight_decay, log_path)
-        self.criterion = nn.NLLLoss()
+    def __init__(self, learning_rate=1e-3, log_path='./'):
+        super().__init__(learning_rate, log_path)
+        self.criterion = nn.BCELoss()
 
         self.conv1d = nn.Sequential(
             nn.Conv1d(in_channels=1, out_channels=16, kernel_size=8, stride=1, padding=0),
@@ -123,8 +120,8 @@ class CNN1D(CNN):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(64 * 83 * 5, 512),
-            nn.Linear(512, 64),
+            nn.Linear(32 * 5 * 7, 64),
+            nn.ReLU(),
             nn.Linear(64, 2),
         )
 
@@ -134,4 +131,5 @@ class CNN1D(CNN):
         x = x.permute(0, 3, 2, 1)
         x = self.conv2d(x)
         logits = self.linear(x)
-        return F.log_softmax(logits, dim=1)
+        preds = torch.argmax(logits, dim=1)
+        return logits, preds

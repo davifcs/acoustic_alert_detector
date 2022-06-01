@@ -15,11 +15,10 @@ model:
     dropout: 0.2
 learning_rate: 0.001 # initial learning rate
 weight_decay: 0 # optimizer weight decay
-epochs: 1
+epochs: 50
 batch_size: 64
 datasets:
-  main: 'audioset'
-  support: 'esc50'
+  main: 'esc50'
   audioset:
     annotations_file: './data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv'
     audio_dir: './data/AudioSet/balanced_train_segments/'
@@ -32,19 +31,19 @@ datasets:
     audio_dir: './data/UrbanSound8K/audio/'
     folds: [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 ]
 runs_dir : './runs/exp'
-target_size: 1.5 # target size in seconds
+target_size: 1 # target size in seconds
 target_sr: 22050 # target sample rate
 transforms:
   type: "mel_spectrogram"
   mel_spectrogram:
-    n_fft: 2048
+    n_fft: 1024
     hop_length: 512
-    n_mels: 64
+    n_mels: 32
     power: 2 # power
     center: False
     normalized: False,
     mel_scale: "slaney"
   mfcc:
-    n_mfcc: 40
+    n_mfcc: 32
     dct_type: 2
     norm: 'ortho'

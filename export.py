@@ -6,7 +6,7 @@ from onnxmltools.utils.float16_converter import convert_float_to_float16
 import torch.onnx
 import onnxruntime as ort
 import numpy as np
-from models.convolutional import CNN2D, CNN1D
+from models.convolutional import CNN, CNN2D, CNN1D
 from models.transformer import ViT
 
 
@@ -24,8 +24,7 @@ argparser.add_argument('-i',
 
 
 def convert_onnx(model_path, input_size):
-    model = CNN1D.load_from_checkpoint(checkpoint_path=model_path, embed_dim=16, hidden_dim=16, num_heads=2, patch_size=4,
-                                     num_channels=1, num_patches=64, num_classes=2, dropout=0.2, lr=1e-3)
+    model = CNN2D.load_from_checkpoint(checkpoint_path=model_path)
     model.eval()
     dummy_input = torch.randn(input_size, requires_grad=True)
     onnx_model_path = str(path.splitext(model_path)[0])+".onnx"
@@ -44,7 +43,8 @@ def convert_onnx(model_path, input_size):
 
     pred_data = model(dummy_input)
 
-    np.testing.assert_allclose(pred_data.detach().numpy(), ort_outs[0], rtol=1e-03, atol=1e-05)
+    np.testing.assert_allclose(pred_data[0].detach().numpy(), ort_outs[0], rtol=1e-03, atol=1e-05)
+    np.testing.assert_allclose(pred_data[1].detach().numpy(), ort_outs[1], rtol=1e-03, atol=1e-05)
 
 
 if __name__ == '__main__':
