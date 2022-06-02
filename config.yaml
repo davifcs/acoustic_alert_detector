@@ -1,24 +1,25 @@
 gpus: 1 # number of gpus
-workers: 0 # number of cpu threads
+workers: 1 # number of cpu threads
 model:
-  type: "convolutional"
+  type: "transformer"
   cnn:
     dim: 2
   transformer:
     embed_dim: 16
-    hidden_dim: 16
+    hidden_dim: 32
     num_heads: 2
-    patch_size: 8
+    num_layers: 4
+    patch_size: 4
     num_channels: 1
-    num_patches: 40
+    num_patches: 64
     num_classes: 2
     dropout: 0.2
-learning_rate: 0.001 # initial learning rate
+learning_rate: 0.0001 # initial learning rate
 weight_decay: 0 # optimizer weight decay
 epochs: 100
 batch_size: 64
 datasets:
-  main: 'esc50'
+  main: 'urbansound8k'
   audioset:
     annotations_file: './data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv'
     audio_dir: './data/AudioSet/balanced_train_segments/'
@@ -37,7 +38,7 @@ transforms:
   type: "mel_spectrogram"
   mel_spectrogram:
     n_fft: 1024
-    hop_length: 512
+    hop_length: 676
     n_mels: 32
     power: 2 # power
     center: False

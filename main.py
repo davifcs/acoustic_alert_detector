@@ -118,9 +118,12 @@ def main(opt):
         dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size],
                                                                    generator=torch.Generator().manual_seed(42))
 
-        dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers)
-        dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers)
-        dataloader_test = DataLoader(dataset=dataset_test, drop_last=True, num_workers=workers)
+        dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True,
+                                      num_workers=workers, persistent_workers=True)
+        dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers,
+                                    persistent_workers=True)
+        dataloader_test = DataLoader(dataset=dataset_test, drop_last=True, num_workers=workers,
+                                     persistent_workers=True)
 
         if model['type'] == 'convolutional':
             if model['cnn']['dim'] == 2:
@@ -129,10 +132,12 @@ def main(opt):
                 pl_model = CNN1D(learning_rate=learning_rate, log_path=log_path)
         elif model['type'] == 'transformer':
             pl_model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],
-                        num_heads=model['transformer']['num_heads'], patch_size=model['transformer']['patch_size'],
-                        num_channels=model['transformer']['num_channels'], num_patches=model['transformer']['num_patches'],
-                        num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
-                        learning_rate=learning_rate, weight_decay=weight_decay, log_path=log_path)
+                           num_heads=model['transformer']['num_heads'], num_layers=model['transformer']['num_layers'],
+                           patch_size=model['transformer']['patch_size'],
+                           num_channels=model['transformer']['num_channels'],
+                           num_patches=model['transformer']['num_patches'],
+                           num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
+                           learning_rate=learning_rate, log_path=log_path)
         pl_model.to(device)
 
         if not opt.pre_trained_exp_path:
