@@ -96,40 +96,76 @@ class CNN2D(CNN):
 class CNN1D(CNN):
     def __init__(self, learning_rate=1e-3, log_path='./'):
         super().__init__(learning_rate, log_path)
-        self.criterion = nn.BCELoss()
+        self.criterion = nn.CrossEntropyLoss()
 
         self.conv1d = nn.Sequential(
-            nn.Conv1d(in_channels=1, out_channels=16, kernel_size=8, stride=1, padding=0),
+            nn.Conv1d(in_channels=1, out_channels=16, kernel_size=64, stride=2, padding=0),
             nn.ReLU(),
-            nn.Conv1d(in_channels=16, out_channels=32, kernel_size=8, stride=1, padding=0),
+            nn.MaxPool1d(kernel_size=8),
+            nn.Conv1d(in_channels=16, out_channels=32, kernel_size=32, stride=2, padding=0),
             nn.ReLU(),
-            nn.MaxPool1d(kernel_size=32)
-        )
-        self.conv2d = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
+            nn.MaxPool1d(kernel_size=8),
+            nn.Conv1d(in_channels=32, out_channels=64, kernel_size=16, stride=2, padding=0),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=(1, 1), padding=0),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2),
-            nn.Dropout(p=0.2),
-            # nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
-            # nn.AvgPool2d(kernel_size=(6, 2), stride=(6, 2))
+            nn.Conv1d(in_channels=64, out_channels=128, kernel_size=8, stride=2, padding=0),
+            nn.ReLU()
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(32 * 5 * 7, 64),
+            nn.Linear(128 * 14, 64),
             nn.ReLU(),
             nn.Linear(64, 2),
         )
 
     def forward(self, x):
         x = self.conv1d(x)
-        x = x.unsqueeze(3)
-        x = x.permute(0, 3, 2, 1)
-        x = self.conv2d(x)
+        logits = self.linear(x)
+        preds = torch.argmax(logits, dim=1)
+        return logits, preds
+
+
+class DSCNN(CNN):
+    def __init__(self, learning_rate=1e-3, log_path='./'):
+        super().__init__(learning_rate, log_path)
+        self.criterion = nn.CrossEntropyLoss()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(3, 3), padding=1, groups=1),
+            nn.Conv2d(in_channels=1, out_channels=16, kernel_size=(1, 1)),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(3, 3), padding=1, groups=16),
+            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(1, 1)),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            nn.Conv2d(in_channels=16, out_channels=16, kernel_size=(3, 3), padding=1, groups=16),
+            nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(1, 1)),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), padding=1, groups=32),
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(1, 1)),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+
+            nn.Conv2d(in_channels=32, out_channels=32, kernel_size=(3, 3), padding=1, groups=32),
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(1, 1)),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), padding=1, groups=64),
+            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(1, 1)),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Dropout(p=0.2),
+            # nn.Conv2d(in_channels=64, out_channels=2, kernel_size=(1, 1), stride=(1, 1), padding=0),
+            # nn.AvgPool2d(kernel_size=(2, 1), stride=(2, 1))
+        )
+        self.linear = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(64 * 4 * 5, 64),
+            nn.ReLU(),
+            nn.Linear(64, 2),
+        )
+
+    def forward(self, x):
+        x = self.conv(x)
         logits = self.linear(x)
         preds = torch.argmax(logits, dim=1)
         return logits, preds

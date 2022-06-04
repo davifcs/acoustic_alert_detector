@@ -12,7 +12,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from utils.general import increment_path
 from utils.dataset import ESC50, UrbanSound8K, AudioSet
-from models.convolutional import CNN2D, CNN1D
+from models.convolutional import DSCNN, CNN2D, CNN1D
 from models.transformer import ViT
 
 SEED = 42
@@ -126,7 +126,9 @@ def main(opt):
                                      persistent_workers=True)
 
         if model['type'] == 'convolutional':
-            if model['cnn']['dim'] == 2:
+            if model['cnn']['dim'] == 2 and model['cnn']['deepwise_separable']:
+                pl_model = DSCNN(learning_rate=learning_rate, log_path=log_path)
+            elif model['cnn']['dim'] == 2 :
                 pl_model = CNN2D(learning_rate=learning_rate, log_path=log_path)
             elif model['cnn']['dim'] == 1:
                 pl_model = CNN1D(learning_rate=learning_rate, log_path=log_path)
