@@ -235,7 +235,7 @@ class GhostNet(LightningModule):
         x, y = batch
         logits, preds = self.forward(x)
         loss = self.criterion(logits, y)
-        acc = accuracy(preds, y)
+        acc = accuracy(preds, y.argmax(dim=1))
 
         if stage:
             self.log(f'{stage}_acc', acc.item(), prog_bar=True)
@@ -251,7 +251,7 @@ class GhostNet(LightningModule):
 
     def test_epoch_end(self, outputs):
         preds = torch.cat([output['predictions'] for output in outputs])
-        labels = torch.cat([output['label'] for output in outputs])
+        labels = torch.cat([output['label'] for output in outputs]).argmax(dim=1)
         f1 = f1_score(preds, labels, average='macro', num_classes=2)
 
         report = classification_report(labels.cpu(), preds.cpu())
