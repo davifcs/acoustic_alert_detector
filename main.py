@@ -14,6 +14,7 @@ from utils.general import increment_path
 from utils.dataset import ESC50, UrbanSound8K, AudioSet
 from models.convolutional import DSCNN, CNN2D, CNN1D
 from models.transformer import ViT
+from models.deepwise import GhostNet
 
 SEED = 42
 seed_everything(SEED)
@@ -119,19 +120,48 @@ def main(opt):
                                                                    generator=torch.Generator().manual_seed(42))
 
         dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True,
-                                      num_workers=workers, persistent_workers=True)
+                                      num_workers=workers, persistent_workers=True, pin_memory=True)
         dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers,
-                                    persistent_workers=True)
+                                    persistent_workers=True, pin_memory=True)
         dataloader_test = DataLoader(dataset=dataset_test, drop_last=True, num_workers=workers,
-                                     persistent_workers=True)
+                                     persistent_workers=True, pin_memory=True)
 
         if model['type'] == 'convolutional':
             if model['cnn']['dim'] == 2 and model['cnn']['deepwise_separable']:
                 pl_model = DSCNN(learning_rate=learning_rate, log_path=log_path)
-            elif model['cnn']['dim'] == 2 :
+            elif model['cnn']['dim'] == 2:
                 pl_model = CNN2D(learning_rate=learning_rate, log_path=log_path)
             elif model['cnn']['dim'] == 1:
                 pl_model = CNN1D(learning_rate=learning_rate, log_path=log_path)
+        elif model['type'] == 'ghostnet':
+            cfgs = [
+                # k, t, c, SE, s
+                # stage1
+                [[3, 16, 16, 0, 1]],
+                # stage2
+                [[3, 48, 24, 0, 2]],
+                [[3, 72, 24, 0, 1]],
+                # stage3
+                [[5, 72, 40, 0.25, 2]],
+                [[5, 120, 40, 0.25, 1]],
+                # stage4
+                [[3, 240, 80, 0, 2]],
+                [[3, 200, 80, 0, 1],
+                 [3, 184, 80, 0, 1],
+                 [3, 184, 80, 0, 1],
+                 [3, 480, 112, 0.25, 1],
+                 [3, 672, 112, 0.25, 1]
+                 ],
+                # stage5
+                [[5, 672, 160, 0.25, 2]],
+                [[5, 960, 160, 0, 1],
+                 [5, 960, 160, 0.25, 1],
+                 [5, 960, 160, 0, 1],
+                 [5, 960, 160, 0.25, 1]
+                 ]
+            ]
+            pl_model = GhostNet(cfgs, width=0.2, learning_rate=learning_rate, log_path=log_path)
+
         elif model['type'] == 'transformer':
             pl_model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],
                            num_heads=model['transformer']['num_heads'], num_layers=model['transformer']['num_layers'],
@@ -140,6 +170,8 @@ def main(opt):
                            num_patches=model['transformer']['num_patches'],
                            num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
                            learning_rate=learning_rate, log_path=log_path)
+
+
         pl_model.to(device)
 
         if not opt.pre_trained_exp_path:

@@ -1,9 +1,10 @@
 gpus: 1 # number of gpus
-workers: 1 # number of cpu threads
+workers: 3 # number of cpu threads
 model:
-  type: "transformer"
+  type: "ghostnet"
   cnn:
-    dim: 2
+    dim: 1
+    deepwise_separable: Ghost
   transformer:
     embed_dim: 16
     hidden_dim: 32
@@ -14,12 +15,12 @@ model:
     num_patches: 64
     num_classes: 2
     dropout: 0.2
-learning_rate: 0.0001 # initial learning rate
+learning_rate: 0.001 # initial learning rate
 weight_decay: 0 # optimizer weight decay
-epochs: 100
-batch_size: 64
+epochs: 200
+batch_size: 32
 datasets:
-  main: 'urbansound8k'
+  main: 'esc50'
   audioset:
     annotations_file: './data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv'
     audio_dir: './data/AudioSet/balanced_train_segments/'
@@ -35,10 +36,10 @@ runs_dir : './runs/exp'
 target_size: 1 # target size in seconds
 target_sr: 22050 # target sample rate
 transforms:
-  type: "mel_spectrogram"
+  type: "mfcc"
   mel_spectrogram:
     n_fft: 1024
-    hop_length: 676
+    hop_length: 512
     n_mels: 32
     power: 2 # power
     center: False
