@@ -92,7 +92,8 @@ def main(opt):
                                 target_sr=target_sr,
                                 target_size=target_size,
                                 model=model['type'],
-                                patch_size=model['transformer']['patch_size'])
+                                patch_size=model['transformer']['patch_size'],
+                                mixup=datasets['mixup'])
 
     for fold in datasets[datasets['main']]['folds']:
         log_path = f"{save_dir}/{datasets['main']}-{fold}/"
@@ -105,7 +106,8 @@ def main(opt):
                                        target_sr=target_sr,
                                        target_size=target_size,
                                        model=model['type'],
-                                       patch_size=model['transformer']['patch_size'])
+                                       patch_size=model['transformer']['patch_size'],
+                                       mixup=datasets['mixup'])
             dataset_test = ESC50(train=False,
                                  annotations_file=datasets['esc50']['annotations_file'],
                                  audio_dir=datasets['esc50']['audio_dir'],
@@ -125,7 +127,8 @@ def main(opt):
                                               target_sr=target_sr,
                                               target_size=target_size,
                                               model=model['type'],
-                                              patch_size=model['transformer']['patch_size'])
+                                              patch_size=model['transformer']['patch_size'],
+                                              mixup=datasets['mixup'])
             dataset_test = UrbanSound8K(train=False,
                                         annotations_file=datasets['urbansound8k']['annotations_file'],
                                         audio_dir=datasets['urbansound8k']['audio_dir'],
@@ -207,7 +210,7 @@ def main(opt):
             tb_logger = pl_loggers.TensorBoardLogger(save_dir=log_path)
 
             trainer = Trainer(max_epochs=epochs, gpus=gpus, callbacks=checkpoint_callback,
-                              log_every_n_steps=len(dataset_train)/batch_size/4, logger=tb_logger, overfit_batches=0.1)
+                              log_every_n_steps=len(dataset_train)/batch_size/4, logger=tb_logger)
             trainer.fit(model=pl_model, train_dataloaders=dataloader_train, val_dataloaders=dataloader_val)
 
             trainer.test(ckpt_path=glob.glob(f"{log_path}/trained_models/*.ckpt")[0],

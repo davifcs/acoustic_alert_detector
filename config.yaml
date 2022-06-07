@@ -1,5 +1,5 @@
 gpus: 1 # number of gpus
-workers: 3 # number of cpu threads
+workers: 4 # number of cpu threads
 model:
   type: "ghostnet"
   cnn:
@@ -20,6 +20,7 @@ weight_decay: 0 # optimizer weight decay
 epochs: 200
 batch_size: 32
 datasets:
+  mixup: True
   main: 'esc50'
   audioset:
     annotations_file: './data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv'

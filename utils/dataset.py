@@ -15,7 +15,7 @@ random.seed(SEED)
 
 
 class BaseDataset(Dataset):
-    def __init__(self, train, transforms, target_sr, target_size, model, patch_size, mixup_alpha=0.2):
+    def __init__(self, train, transforms, target_sr, target_size, model, patch_size, mixup):
         super().__init__()
         self.train = train
         self.transforms = transforms
@@ -23,7 +23,7 @@ class BaseDataset(Dataset):
         self.target_size = int(target_size * target_sr)
         self.model = model
         self.patch_size = patch_size
-        self.mixup_alpha = mixup_alpha
+        self.mixup = mixup
 
     def _map_target_classes(self, map_class_to_id):
         self.annotations.target = self.annotations.category.apply(
@@ -63,22 +63,28 @@ class BaseDataset(Dataset):
         return signal
 
     def _mix_up(self, signal, mixup_signal, label, mixup_label):
+        gain_signal = torch.max(torchaudio.transforms.AmplitudeToDB(top_db=80)(signal))
+        gain_mixup_signal = torch.max(torchaudio.transforms.AmplitudeToDB(top_db=80)(mixup_signal))
+
+        ratio = np.random.randint(low=0, high=1)
+
+        p = 1.0 / (1 + np.power(10, (gain_signal - gain_mixup_signal) / 20.) * (1 - ratio) / ratio)
+        signal = ((signal * p + mixup_signal * (1 - p)) / np.sqrt(p ** 2 + (1 - p) ** 2))
+
         one_hot_label = torch.zeros(2)
         one_hot_label[label] = 1.
         mixup_one_hot_label = torch.zeros(2)
         mixup_one_hot_label[mixup_label] = 1.
 
-        lam = np.random.beta(self.mixup_alpha, self.mixup_alpha)
-        signal = lam * signal + (1 - lam) * mixup_signal
-        label = lam * one_hot_label + (1 - lam) * mixup_one_hot_label
+        label = ratio * one_hot_label + (1 - ratio) * mixup_one_hot_label
 
         return signal, label
 
 
 class ESC50(BaseDataset):
-    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model,
-                 patch_size):
-        super().__init__(train, transforms, target_sr, target_size, model, patch_size)
+    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model, patch_size,
+                 mixup=False):
+        super().__init__(train, transforms, target_sr, target_size, model, patch_size, mixup)
         self.annotations = pd.read_csv(annotations_file)
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
         self.annotations.reset_index(drop=True, inplace=True)
@@ -93,7 +99,7 @@ class ESC50(BaseDataset):
         label = self.annotations.target[index]
         signal = self._load_signal(audio_sample_path, label)
 
-        if self.train:
+        if self.train and self.mixup and bool(random.getrandbits(1)):
             mixup_index = random.randint(0, len(self.annotations) - 1)
             mixup_audio_sample_path = os.path.join(self.audio_dir, self.annotations.filename[mixup_index])
             mixup_label = self.annotations.target[mixup_index]
@@ -112,8 +118,9 @@ class ESC50(BaseDataset):
 
 
 class UrbanSound8K(BaseDataset):
-    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model, patch_size):
-        super().__init__(train, transforms, target_sr, target_size, model, patch_size)
+    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model, patch_size,
+                 mixup=False):
+        super().__init__(train, transforms, target_sr, target_size, model, patch_size, mixup)
         self.annotations = pd.read_csv(annotations_file)
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
         self.annotations.reset_index(drop=True, inplace=True)
@@ -129,10 +136,10 @@ class UrbanSound8K(BaseDataset):
         label = self.annotations['classID'][index]
         signal = self._get_item(audio_sample_path, label)
 
-        if self.train:
+        if self.train and self.mixup and bool(random.getrandbits(1)):
             mixup_index = random.randint(0, len(self.annotations) - 1)
-            mixup_audio_sample_path = os.path.join(self.audio_dir, "fold"+str(self.annotations.fold[index]),
-                                         self.annotations.slice_file_name[index])
+            mixup_audio_sample_path = os.path.join(self.audio_dir, "fold"+str(self.annotations.fold[mixup_index]),
+                                         self.annotations.slice_file_name[mixup_index])
             mixup_label = self.annotations['classID'][mixup_index]
             mixup_signal = self._load_signal(mixup_audio_sample_path, mixup_label)
             signal, label = self._mix_up(signal, mixup_signal, label, mixup_label)
@@ -140,7 +147,6 @@ class UrbanSound8K(BaseDataset):
             one_hot_label = torch.zeros(2)
             one_hot_label[label] = 1.
             label = one_hot_label
-
         if self.transforms:
             for transform in self.transforms:
                 signal = transform(signal)
@@ -150,8 +156,9 @@ class UrbanSound8K(BaseDataset):
 
 
 class AudioSet(BaseDataset):
-    def __init__(self, train, annotations_file, audio_dir, transforms, target_sr, target_size, model, patch_size):
-        super().__init__(train, transforms, target_sr, target_size, model, patch_size)
+    def __init__(self, train, annotations_file, audio_dir, transforms, target_sr, target_size, model, patch_size,
+                 mixup):
+        super().__init__(train, transforms, target_sr, target_size, model, patch_size, mixup)
         self.annotations = pd.read_csv(annotations_file, delimiter=',', names=list(range(10)), dtype=object)
         self.annotations.reset_index(drop=True, inplace=True)
         self.audio_dir = audio_dir
@@ -164,8 +171,17 @@ class AudioSet(BaseDataset):
                                                           str(self.annotations.iloc[index, 1][1:]))+".wav")
         signal = self._load_signal(audio_sample_path, label=1)
 
-        label = torch.zeros(2)
-        label[1] = 1.
+        if self.train and self.mixup and bool(random.getrandbits(1)):
+            mixup_index = random.randint(0, len(self.annotations) - 1)
+            mixup_audio_sample_path = os.path.join(self.audio_dir, (self.annotations.iloc[mixup_index, 0] + "_" +
+                                                          str(self.annotations.iloc[mixup_index, 1][1:]))+".wav")
+            mixup_label = 1
+            mixup_signal = self._load_signal(mixup_audio_sample_path, mixup_label)
+            signal, label = self._mix_up(signal, mixup_signal, 1, mixup_label)
+        else:
+            one_hot_label = torch.zeros(2)
+            one_hot_label[1] = 1.
+            label = one_hot_label
 
         if self.transforms:
             for transform in self.transforms:
@@ -194,6 +210,7 @@ if __name__ == "__main__":
         target_sr=16000,
         target_size=1,
         model='cnn',
-        patch_size=4)
+        patch_size=4,
+        mixup=True)
 
     next(iter(audioset))
