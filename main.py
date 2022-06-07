@@ -56,15 +56,15 @@ def main(opt):
 
     if transforms['type'] == "mel_spectrogram":
         transforms = [torchaudio.transforms.MelSpectrogram(sample_rate=target_sr,
-                                                          f_min=0,
-                                                          n_fft=transforms['mel_spectrogram']['n_fft'],
-                                                          win_length=transforms['mel_spectrogram']['n_fft'],
-                                                          hop_length=transforms['mel_spectrogram']['hop_length'],
-                                                          center=transforms['mel_spectrogram']['center'],
-                                                          normalized=transforms['mel_spectrogram']['normalized'],
-                                                          mel_scale="slaney",
-                                                          n_mels=transforms['mel_spectrogram']['n_mels'],
-                                                          power=transforms['mel_spectrogram']['power']),
+                                                           f_min=0,
+                                                           n_fft=transforms['mel_spectrogram']['n_fft'],
+                                                           win_length=transforms['mel_spectrogram']['n_fft'],
+                                                           hop_length=transforms['mel_spectrogram']['hop_length'],
+                                                           center=transforms['mel_spectrogram']['center'],
+                                                           normalized=transforms['mel_spectrogram']['normalized'],
+                                                           mel_scale="slaney",
+                                                           n_mels=transforms['mel_spectrogram']['n_mels'],
+                                                           power=transforms['mel_spectrogram']['power']),
                       torchaudio.transforms.AmplitudeToDB(top_db=80.0)]
 
     elif transforms['type'] == "mfcc":
@@ -85,32 +85,59 @@ def main(opt):
 
     device = 'cuda' if gpus > 0 else 'cpu'
 
-    audioset_dataset = AudioSet(datasets['audioset']['annotations_file'], datasets['audioset']['audio_dir'],
-                                transforms, target_sr, target_size, model['type'],
-                                model['transformer']['patch_size'])
+    audioset_dataset = AudioSet(train=True,
+                                annotations_file=datasets['audioset']['annotations_file'],
+                                audio_dir=datasets['audioset']['audio_dir'],
+                                transforms=transforms,
+                                target_sr=target_sr,
+                                target_size=target_size,
+                                model=model['type'],
+                                patch_size=model['transformer']['patch_size'],
+                                mixup=datasets['mixup'])
 
     for fold in datasets[datasets['main']]['folds']:
         log_path = f"{save_dir}/{datasets['main']}-{fold}/"
         if datasets['main'] == 'esc50':
-            main_dataset_train = ESC50(datasets['esc50']['annotations_file'], datasets['esc50']['audio_dir'],
-                                          datasets['esc50']['folds'][:fold-1] + datasets['esc50']['folds'][fold:],
-                                          transforms, target_sr, target_size,
-                                          model['type'], model['transformer']['patch_size'])
-            dataset_test = ESC50(datasets['esc50']['annotations_file'], datasets['esc50']['audio_dir'],
-                                         [fold], transforms, target_sr, target_size,
-                                         model['type'], model['transformer']['patch_size'])
+            main_dataset_train = ESC50(train=True,
+                                       annotations_file=datasets['esc50']['annotations_file'],
+                                       audio_dir=datasets['esc50']['audio_dir'],
+                                       folds=datasets['esc50']['folds'][:fold-1] + datasets['esc50']['folds'][fold:],
+                                       transforms=transforms,
+                                       target_sr=target_sr,
+                                       target_size=target_size,
+                                       model=model['type'],
+                                       patch_size=model['transformer']['patch_size'],
+                                       mixup=datasets['mixup'])
+            dataset_test = ESC50(train=False,
+                                 annotations_file=datasets['esc50']['annotations_file'],
+                                 audio_dir=datasets['esc50']['audio_dir'],
+                                 folds=[fold],
+                                 transforms=transforms,
+                                 target_sr=target_sr,
+                                 target_size=target_size,
+                                 model=model['type'],
+                                 patch_size=model['transformer']['patch_size'])
         elif datasets['main'] == 'urbansound8k':
-            main_dataset_train = UrbanSound8K(datasets['urbansound8k']['annotations_file'],
-                                                 datasets['urbansound8k']['audio_dir'],
-                                                 datasets['urbansound8k']['folds'][:fold-1] +
-                                                 datasets['urbansound8k']['folds'][fold:],
-                                                 transforms, target_sr, target_size, model['type'],
-                                                 model['transformer']['patch_size'])
-            dataset_test = UrbanSound8K(datasets['urbansound8k']['annotations_file'],
-                                                 datasets['urbansound8k']['audio_dir'],
-                                                 [fold],
-                                                 transforms, target_sr, target_size, model['type'],
-                                                 model['transformer']['patch_size'])
+            main_dataset_train = UrbanSound8K(train=True,
+                                              annotations_file=datasets['urbansound8k']['annotations_file'],
+                                              audio_dir=datasets['urbansound8k']['audio_dir'],
+                                              folds=datasets['urbansound8k']['folds'][:fold-1] +
+                                                    datasets['urbansound8k']['folds'][fold:],
+                                              transforms=transforms,
+                                              target_sr=target_sr,
+                                              target_size=target_size,
+                                              model=model['type'],
+                                              patch_size=model['transformer']['patch_size'],
+                                              mixup=datasets['mixup'])
+            dataset_test = UrbanSound8K(train=False,
+                                        annotations_file=datasets['urbansound8k']['annotations_file'],
+                                        audio_dir=datasets['urbansound8k']['audio_dir'],
+                                        folds=[fold],
+                                        transforms=transforms,
+                                        target_sr=target_sr,
+                                        target_size=target_size,
+                                        model=model['type'],
+                                        patch_size=model['transformer']['patch_size'])
 
         dataset_train = ConcatDataset([main_dataset_train, audioset_dataset])
 
@@ -170,7 +197,6 @@ def main(opt):
                            num_patches=model['transformer']['num_patches'],
                            num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
                            learning_rate=learning_rate, log_path=log_path)
-
 
         pl_model.to(device)
 
