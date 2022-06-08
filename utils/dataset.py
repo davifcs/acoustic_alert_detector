@@ -66,17 +66,13 @@ class BaseDataset(Dataset):
         gain_signal = torch.max(torchaudio.transforms.AmplitudeToDB(top_db=80)(signal))
         gain_mixup_signal = torch.max(torchaudio.transforms.AmplitudeToDB(top_db=80)(mixup_signal))
 
-        ratio = np.random.randint(low=0, high=1)
+        ratio = random.random()
 
         p = 1.0 / (1 + np.power(10, (gain_signal - gain_mixup_signal) / 20.) * (1 - ratio) / ratio)
         signal = ((signal * p + mixup_signal * (1 - p)) / np.sqrt(p ** 2 + (1 - p) ** 2))
 
-        one_hot_label = torch.zeros(2)
-        one_hot_label[label] = 1.
-        mixup_one_hot_label = torch.zeros(2)
-        mixup_one_hot_label[mixup_label] = 1.
-
-        label = ratio * one_hot_label + (1 - ratio) * mixup_one_hot_label
+        eye = torch.eye(2)
+        label = (eye[label] * ratio + eye[mixup_label] * (1 - ratio))
 
         return signal, label
 
@@ -106,9 +102,8 @@ class ESC50(BaseDataset):
             mixup_signal = self._load_signal(mixup_audio_sample_path, mixup_label)
             signal, label = self._mix_up(signal, mixup_signal, label, mixup_label)
         else:
-            one_hot_label = torch.zeros(2)
-            one_hot_label[label] = 1.
-            label = one_hot_label
+            eye = torch.eye(2)
+            label = eye[label]
         if self.transforms:
             for transform in self.transforms:
                 signal = transform(signal)
@@ -144,9 +139,9 @@ class UrbanSound8K(BaseDataset):
             mixup_signal = self._load_signal(mixup_audio_sample_path, mixup_label)
             signal, label = self._mix_up(signal, mixup_signal, label, mixup_label)
         else:
-            one_hot_label = torch.zeros(2)
-            one_hot_label[label] = 1.
-            label = one_hot_label
+            eye = torch.eye(2)
+            label = eye[label]
+
         if self.transforms:
             for transform in self.transforms:
                 signal = transform(signal)
@@ -179,9 +174,8 @@ class AudioSet(BaseDataset):
             mixup_signal = self._load_signal(mixup_audio_sample_path, mixup_label)
             signal, label = self._mix_up(signal, mixup_signal, 1, mixup_label)
         else:
-            one_hot_label = torch.zeros(2)
-            one_hot_label[1] = 1.
-            label = one_hot_label
+            eye = torch.eye(2)
+            label = eye[1]
 
         if self.transforms:
             for transform in self.transforms:
