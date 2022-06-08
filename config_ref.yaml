@@ -1,5 +1,5 @@
 gpus: 1 # number of gpus
-workers: 4 # number of cpu threads
+workers: 0 # number of cpu threads
 model:
   type: "ghostnet"
   cnn:
@@ -17,7 +17,7 @@ model:
     dropout: 0.2
 learning_rate: 0.001 # initial learning rate
 weight_decay: 0 # optimizer weight decay
-epochs: 200
+epochs: 300
 batch_size: 32
 datasets:
   mixup: True
@@ -37,7 +37,7 @@ runs_dir : './runs/exp'
 target_size: 1 # target size in seconds
 target_sr: 22050 # target sample rate
 transforms:
-  type: "mfcc"
+  type: "mel_spectrogram"
   mel_spectrogram:
     n_fft: 1024
     hop_length: 512

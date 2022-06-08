@@ -155,11 +155,11 @@ def main(opt):
 
         if model['type'] == 'convolutional':
             if model['cnn']['dim'] == 2 and model['cnn']['deepwise_separable']:
-                pl_model = DSCNN(learning_rate=learning_rate, log_path=log_path)
+                pl_model = DSCNN(learning_rate=learning_rate, log_path=log_path, patience=int(epochs/10))
             elif model['cnn']['dim'] == 2:
-                pl_model = CNN2D(learning_rate=learning_rate, log_path=log_path)
+                pl_model = CNN2D(learning_rate=learning_rate, log_path=log_path, patience=int(epochs/10))
             elif model['cnn']['dim'] == 1:
-                pl_model = CNN1D(learning_rate=learning_rate, log_path=log_path)
+                pl_model = CNN1D(learning_rate=learning_rate, log_path=log_path, patience=int(epochs/10))
         elif model['type'] == 'ghostnet':
             cfgs = [
                 # k, t, c, SE, s
@@ -187,7 +187,7 @@ def main(opt):
                  [5, 960, 160, 0.25, 1]
                  ]
             ]
-            pl_model = GhostNet(cfgs, width=0.2, learning_rate=learning_rate, log_path=log_path)
+            pl_model = GhostNet(cfgs, width=0.2, learning_rate=learning_rate, log_path=log_path, patience=int(epochs/5))
 
         elif model['type'] == 'transformer':
             pl_model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],

@@ -7,15 +7,16 @@ from sklearn.metrics import confusion_matrix, classification_report
 
 
 class CNN(LightningModule):
-    def __init__(self, learning_rate, log_path):
+    def __init__(self, learning_rate, log_path, patience):
         super().__init__()
 
         self.learning_rate = learning_rate
+        self.patience = patience
         self.log_path = log_path
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=self.patience)
         return {'optimizer': optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_loss'}
 
     def training_step(self, batch, batch_idx):
@@ -59,8 +60,8 @@ class CNN(LightningModule):
 
 
 class CNN2D(CNN):
-    def __init__(self, learning_rate=1e-3, log_path='./'):
-        super().__init__(learning_rate, log_path)
+    def __init__(self, learning_rate=1e-3, log_path='./', patience=20):
+        super().__init__(learning_rate, log_path, patience)
         self.criterion = nn.CrossEntropyLoss()
 
         self.conv = nn.Sequential(
@@ -94,8 +95,8 @@ class CNN2D(CNN):
 
 
 class CNN1D(CNN):
-    def __init__(self, learning_rate=1e-3, log_path='./'):
-        super().__init__(learning_rate, log_path)
+    def __init__(self, learning_rate=1e-3, log_path='./', patience=20):
+        super().__init__(learning_rate, log_path, patience)
         self.criterion = nn.CrossEntropyLoss()
 
         self.conv1d = nn.Sequential(
@@ -125,8 +126,8 @@ class CNN1D(CNN):
 
 
 class DSCNN(CNN):
-    def __init__(self, learning_rate=1e-3, log_path='./'):
-        super().__init__(learning_rate, log_path)
+    def __init__(self, learning_rate=1e-3, log_path='./', patience=20):
+        super().__init__(learning_rate, log_path, patience)
         self.criterion = nn.CrossEntropyLoss()
 
         self.conv = nn.Sequential(

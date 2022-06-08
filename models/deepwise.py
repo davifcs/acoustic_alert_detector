@@ -161,9 +161,10 @@ class GhostBottleneck(nn.Module):
 
 
 class GhostNet(LightningModule):
-    def __init__(self, cfgs,  learning_rate, log_path, num_classes=2, width=1.0, dropout=0.2):
+    def __init__(self, cfgs,  learning_rate, log_path, patience, num_classes=2, width=1.0, dropout=0.2):
         super(GhostNet, self).__init__()
         self.learning_rate = learning_rate
+        self.patience = patience
         self.log_path = log_path
         self.criterion = nn.CrossEntropyLoss()
 
@@ -221,7 +222,7 @@ class GhostNet(LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=self.patience)
         return {'optimizer': optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_loss'}
 
     def training_step(self, batch, batch_idx):
