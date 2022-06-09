@@ -83,6 +83,20 @@ class BaseDataset(Dataset):
 
         return signal, label
 
+    def _pre_processing(self, signal):
+        if self.transforms:
+            for transform in self.transforms:
+                if isinstance(signal, list):
+                    for i, s in enumerate(signal):
+                        signal[i] = transform(s)
+                else:
+                    signal = transform(signal)
+        if self.model == 'transformer':
+            if isinstance(signal, list):
+                for i, s in enumerate(signal):
+                    signal[i] = self._img_to_patch(s, self.patch_size)
+        return signal
+
 
 class ESC50(BaseDataset):
     def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model, patch_size,
@@ -111,11 +125,7 @@ class ESC50(BaseDataset):
         else:
             eye = torch.eye(2)
             label = eye[label]
-        if self.transforms:
-            for transform in self.transforms:
-                signal = transform(signal)
-        if self.model == 'transformer':
-            signal = self._img_to_patch(signal, self.patch_size)
+        signal = self._pre_processing(signal)
         return signal, label
 
 
@@ -148,12 +158,7 @@ class UrbanSound8K(BaseDataset):
         else:
             eye = torch.eye(2)
             label = eye[label]
-
-        if self.transforms:
-            for transform in self.transforms:
-                signal = transform(signal)
-        if self.model == 'transformer':
-            signal = self._img_to_patch(signal, self.patch_size)
+        signal = self._pre_processing(signal)
         return signal, label
 
 
@@ -183,12 +188,7 @@ class AudioSet(BaseDataset):
         else:
             eye = torch.eye(2)
             label = eye[1]
-
-        if self.transforms:
-            for transform in self.transforms:
-                signal = transform(signal)
-        if self.model == 'transformer':
-            signal = self._img_to_patch(signal, self.patch_size)
+        signal = self._pre_processing(signal)
         return signal, label
 
 
@@ -201,7 +201,10 @@ def build_weighted_random_sampler(targets):
 
 def collate_fn(batch):
     x, y = batch[0]
-    x = x.reshape(x.shape[0], 1, x.shape[1])
+    if len(x.shape) < 3:
+        x = x.reshape(x.shape[0], 1, x.shape[1])
+    else:
+        x = x.reshape(x.shape[0], 1, x.shape[1], x.shape[2])
     return x, y.reshape(-1, 2)
 
 
