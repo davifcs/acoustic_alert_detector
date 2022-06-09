@@ -29,6 +29,12 @@ class BaseDataset(Dataset):
         self.annotations.target = self.annotations.category.apply(
             lambda name: map_class_to_id[name] if name in map_class_to_id.keys() else 0)
 
+    def _crop(self, signal):
+        cropped_signal = torch.empty(0, self.target_size)
+        for start in range(0, signal.shape[1], self.target_size):
+            cropped_signal = torch.vstack([cropped_signal, signal[:, start: start + self.target_size]])
+        return cropped_signal
+
     def _random_crop(self, signal, label):
         cropped_rms = 0
         while cropped_rms < 0.0001:
@@ -57,9 +63,10 @@ class BaseDataset(Dataset):
         if signal.shape[1] < self.target_size:
             signal = F.pad(signal, (int((self.target_size / 2 - signal.shape[1] / 2) + 0.5),
                                     int((self.target_size / 2 - signal.shape[1] / 2) + 0.5)), "constant", 0)
-        else:
+        elif self.train:
             signal = self._random_crop(signal, label)
-
+        else:
+            signal = self._crop(signal)
         return signal
 
     def _mix_up(self, signal, mixup_signal, label, mixup_label):
@@ -182,7 +189,6 @@ class AudioSet(BaseDataset):
                 signal = transform(signal)
         if self.model == 'transformer':
             signal = self._img_to_patch(signal, self.patch_size)
-
         return signal, label
 
 
@@ -193,18 +199,22 @@ def build_weighted_random_sampler(targets):
     return WeightedRandomSampler(weights, len(targets))
 
 
+def collate_fn(batch):
+    x, y = batch[0]
+    x = x.reshape(x.shape[0], 1, x.shape[1])
+    return x, y.reshape(-1, 2)
+
+
 if __name__ == "__main__":
-    mel_spectrogram = [torchaudio.transforms.MelSpectrogram(sample_rate=1600, n_fft=1024, hop_length=512, n_mels=64)]
+    esc50_dataset = ESC50(
+                        train=False,
+                        annotations_file='../data/ESC-50-master/meta/esc50.csv',
+                        audio_dir='../data/ESC-50-master/audio/',
+                        folds=[1, 2],
+                        transforms=None,
+                        target_sr=22050,
+                        target_size=1,
+                        model='cnn',
+                        patch_size=4,
+                        mixup=True)
 
-    audioset = UrbanSound8K(
-        annotations_file='../data/UrbanSound8K/metadata/UrbanSound8K.csv',
-        audio_dir='../data/UrbanSound8K/audio/',
-        folds=[1,2],
-        transforms=mel_spectrogram,
-        target_sr=16000,
-        target_size=1,
-        model='cnn',
-        patch_size=4,
-        mixup=True)
-
-    next(iter(audioset))
