@@ -235,6 +235,9 @@ class GhostNet(LightningModule):
     def evaluate(self, batch, stage=None):
         x, y = batch
         logits, preds = self.forward(x)
+        if stage == 'test':
+            logits = logits.mean(dim=0).reshape(-1, 2)
+            preds = torch.argmax(logits, dim=1)
         loss = self.criterion(logits, y)
         acc = accuracy(preds, y.argmax(dim=1))
 

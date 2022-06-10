@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 from pytorch_lightning import Trainer, seed_everything, loggers as pl_loggers
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-
+import utils.dataset
 from utils.general import increment_path
 from utils.dataset import ESC50, UrbanSound8K, AudioSet
 from models.convolutional import DSCNN, CNN2D, CNN1D
@@ -151,7 +151,7 @@ def main(opt):
         dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers,
                                     persistent_workers=True, pin_memory=True)
         dataloader_test = DataLoader(dataset=dataset_test, drop_last=True, num_workers=workers,
-                                     persistent_workers=True, pin_memory=True)
+                                     persistent_workers=True, pin_memory=True, collate_fn=utils.dataset.collate_fn)
 
         if model['type'] == 'convolutional':
             if model['cnn']['dim'] == 2 and model['cnn']['deepwise_separable']:
