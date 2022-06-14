@@ -31,6 +31,10 @@ class BaseDataset(Dataset):
 
     def _crop(self, signal):
         cropped_signal = torch.empty(0, self.target_size)
+        signal_size = signal.shape[1]
+        if signal_size % self.target_size:
+            padding = int((round(signal_size / self.target_size + 0.5) * self.target_size - signal_size) / 2)
+            signal = F.pad(signal, (padding, padding), "constant", 0)
         for start in range(0, signal.shape[1], self.target_size):
             cropped_signal = torch.vstack([cropped_signal, signal[:, start: start + self.target_size]])
         return cropped_signal
