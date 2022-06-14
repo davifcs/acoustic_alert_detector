@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torchmetrics.functional import f1_score, accuracy
 from pytorch_lightning import LightningModule
+from torchvision.ops.focal_loss import sigmoid_focal_loss
 
 from sklearn.metrics import confusion_matrix, classification_report
 
@@ -22,7 +23,7 @@ class CNN(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits, preds = self.forward(x)
-        loss = self.criterion(logits, y)
+        loss = self.criterion(logits, y, reduction='mean')
         self.log('train_loss', loss.item(), prog_bar=True)
         return loss
 
@@ -32,7 +33,7 @@ class CNN(LightningModule):
         if stage == 'test':
             logits = logits.mean(dim=0).reshape(-1, 2)
             preds = torch.argmax(logits, dim=1)
-        loss = self.criterion(logits, y)
+        loss = self.criterion(logits, y, reduction='mean')
         acc = accuracy(preds, y.argmax(dim=1))
 
         if stage:
@@ -65,7 +66,7 @@ class CNN(LightningModule):
 class CNN2D(CNN):
     def __init__(self, learning_rate=1e-3, log_path='./', patience=20):
         super().__init__(learning_rate, log_path, patience)
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = sigmoid_focal_loss
 
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=32, kernel_size=(3, 3), stride=(1, 1), padding=0),
@@ -100,7 +101,7 @@ class CNN2D(CNN):
 class CNN1D(CNN):
     def __init__(self, learning_rate=1e-3, log_path='./', patience=20):
         super().__init__(learning_rate, log_path, patience)
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = sigmoid_focal_loss
 
         self.conv1d = nn.Sequential(
             nn.Conv1d(in_channels=1, out_channels=16, kernel_size=64, stride=2, padding=0),
@@ -116,7 +117,7 @@ class CNN1D(CNN):
         )
         self.linear = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(128 * 14, 64),
+            nn.Linear(128 * 16, 64),
             nn.ReLU(),
             nn.Linear(64, 2),
         )
@@ -131,7 +132,7 @@ class CNN1D(CNN):
 class DSCNN(CNN):
     def __init__(self, learning_rate=1e-3, log_path='./', patience=20):
         super().__init__(learning_rate, log_path, patience)
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = sigmoid_focal_loss
 
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(3, 3), padding=1, groups=1),
