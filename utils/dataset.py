@@ -31,10 +31,12 @@ class BaseDataset(Dataset):
 
     def _crop(self, signal):
         cropped_signal = torch.empty(0, self.target_size)
-        signal_size = signal.shape[1]
-        if signal_size % self.target_size:
-            padding = int((round(signal_size / self.target_size + 0.5) * self.target_size - signal_size) / 2)
-            signal = F.pad(signal, (padding, padding), "constant", 0)
+        if signal.shape[1] % self.target_size:
+            padding = int((round(signal.shape[1] / self.target_size + 0.5) * self.target_size - signal.shape[1]) / 2)
+            if signal.shape[1] % 2:
+                signal = F.pad(signal, (padding, padding + 1), "constant", 0)
+            else:
+                signal = F.pad(signal, (padding, padding), "constant", 0)
         for start in range(0, signal.shape[1], self.target_size):
             cropped_signal = torch.vstack([cropped_signal, signal[:, start: start + self.target_size]])
         return cropped_signal
@@ -65,7 +67,11 @@ class BaseDataset(Dataset):
         if signal.shape[0] > 1:
             signal = torch.mean(signal, dim=0, keepdim=True)
         if signal.shape[1] < self.target_size:
-            signal = F.pad(signal, (int((self.target_size / 2 - signal.shape[1] / 2) + 0.5),
+            if signal.shape[1] % 2:
+                signal = F.pad(signal, (int((self.target_size / 2 - signal.shape[1] / 2) + 0.5),
+                                        int((self.target_size / 2 - signal.shape[1] / 2))), "constant", 0)
+            else:
+                signal = F.pad(signal, (int((self.target_size / 2 - signal.shape[1] / 2) + 0.5),
                                     int((self.target_size / 2 - signal.shape[1] / 2) + 0.5)), "constant", 0)
         elif self.train:
             signal = self._random_crop(signal, label)
@@ -138,6 +144,7 @@ class UrbanSound8K(BaseDataset):
                  mixup=False):
         super().__init__(train, transforms, target_sr, target_size, model, patch_size, mixup)
         self.annotations = pd.read_csv(annotations_file)
+        self.annotations.rename(columns={"class": "category", "classID": "target"}, inplace=True)
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
         self.annotations.reset_index(drop=True, inplace=True)
         self.audio_dir = audio_dir
@@ -149,14 +156,14 @@ class UrbanSound8K(BaseDataset):
     def __getitem__(self, index):
         audio_sample_path = os.path.join(self.audio_dir, "fold"+str(self.annotations.fold[index]),
                                          self.annotations.slice_file_name[index])
-        label = self.annotations['classID'][index]
-        signal = self._get_item(audio_sample_path, label)
+        label = self.annotations.target[index]
+        signal = self._load_signal(audio_sample_path, label)
 
         if self.train and self.mixup and bool(random.getrandbits(1)):
             mixup_index = random.randint(0, len(self.annotations) - 1)
             mixup_audio_sample_path = os.path.join(self.audio_dir, "fold"+str(self.annotations.fold[mixup_index]),
                                          self.annotations.slice_file_name[mixup_index])
-            mixup_label = self.annotations['classID'][mixup_index]
+            mixup_label = self.annotations.target[mixup_index]
             mixup_signal = self._load_signal(mixup_audio_sample_path, mixup_label)
             signal, label = self._mix_up(signal, mixup_signal, label, mixup_label)
         else:
