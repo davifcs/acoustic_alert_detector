@@ -110,7 +110,6 @@ oauthlib=3.2.0=pyhd3eb1b0_0
 onnx=1.10.2=py38he5a1358_2
 onnxconverter-common=1.9.0=pyhd8ed1ab_0
 onnxmltools=1.10.0=pyhd8ed1ab_0
-onnxruntime=1.10.0=pypi_0
 opencv=4.5.1=py38haa244fe_0
 openssl=1.1.1n=h8ffe710_0
 packaging=21.3=pyhd3eb1b0_0
@@ -130,7 +129,6 @@ pyasn1=0.4.8=pyhd3eb1b0_0
 pyasn1-modules=0.2.8=py_0
 pycparser=2.21=pyhd3eb1b0_0
 pydeprecate=0.3.2=pyhd8ed1ab_0
-pyfilterbank=0.0.0=pypi_0
 pygments=2.11.2=pyhd3eb1b0_0
 pyjwt=2.1.0=py38haa95532_0
 pyopenssl=21.0.0=pyhd3eb1b0_1
@@ -170,7 +168,6 @@ threadpoolctl=2.2.0=pyh0d69192_0
 tk=8.6.11=h2bbff1b_0
 torchaudio=0.10.2=py38_cu113
 torchmetrics=0.7.0=pyhd8ed1ab_0
-torchsummary=1.5.1=pypi_0
 torchvision=0.11.3=py38_cu113
 tornado=6.1=py38h2bbff1b_0
 tqdm=4.63.0=pyhd3eb1b0_0
