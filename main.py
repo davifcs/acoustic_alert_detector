@@ -14,7 +14,7 @@ from utils.general import increment_path
 from utils.dataset import ESC50, UrbanSound8K, AudioSet
 from models.convolutional import DSCNN, CNN2D, CNN1D
 from models.transformer import ViT
-from models.deepwise import GhostNet
+from models.ghostnet import GhostNet
 
 SEED = 42
 seed_everything(SEED)
@@ -146,12 +146,12 @@ def main(opt):
         dataset_train, dataset_val = torch.utils.data.random_split(dataset_train, [train_size, val_size],
                                                                    generator=torch.Generator().manual_seed(42))
 
-        dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True,
-                                      num_workers=workers, persistent_workers=True, pin_memory=True)
+        dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers,
+                                      persistent_workers=True)
         dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers,
-                                    persistent_workers=True, pin_memory=True)
+                                    persistent_workers=True)
         dataloader_test = DataLoader(dataset=dataset_test, drop_last=True, num_workers=workers,
-                                     persistent_workers=True, pin_memory=True, collate_fn=utils.dataset.collate_fn)
+                                     collate_fn=utils.dataset.collate_fn, persistent_workers=True)
 
         if model['type'] == 'convolutional':
             if model['cnn']['dim'] == 2 and model['cnn']['deepwise_separable']:

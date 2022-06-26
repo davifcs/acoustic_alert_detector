@@ -1,10 +1,5 @@
 import torch.nn.functional as F
 import math
-import torchsummary
-
-import torch.onnx
-import onnxruntime as ort
-import numpy as np
 
 import torch
 from torch import nn
@@ -299,26 +294,5 @@ def ghostnet(**kwargs):
          [5, 960, 160, 0.25, 1]
          ]
     ]
-    return GhostNet(cfgs, learning_rate=1e-3, log_path='./', width=1, **kwargs)
-
-
-if __name__ == '__main__':
-    model = ghostnet()
-    model.eval()
-    torchsummary.summary(model, input_size=(1, 64, 42), device='cpu')
-    dummy_input = torch.randn((1, 1, 32, 42), requires_grad=True)
-    onnx_model_path = str('./ghostnet') + ".onnx"
-
-    torch.onnx.export(model, dummy_input, onnx_model_path, export_params=True, opset_version=10,
-                      do_constant_folding=True, input_names=['input'],
-                      output_names=['output'], dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}})
-
-    ort_session = ort.InferenceSession(onnx_model_path)
-    ort_inputs = {ort_session.get_inputs()[0].name: dummy_input.detach().numpy()}
-    ort_outs = ort_session.run(None, ort_inputs)
-
-    pred_data = model(dummy_input)
-
-    np.testing.assert_allclose(pred_data[0].detach().numpy(), ort_outs[0], rtol=1e-03, atol=1e-05)
-    np.testing.assert_allclose(pred_data[1].detach().numpy(), ort_outs[1], rtol=1e-03, atol=1e-05)
+    return GhostNet(cfgs, learning_rate=1e-3, log_path='./', patience=20, width=0.1, **kwargs)
 
