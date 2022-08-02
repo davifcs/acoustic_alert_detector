@@ -31,6 +31,7 @@ def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--yaml_file', type=str, default='./config.yaml')
     parser.add_argument('--pre_trained_exp_path', type=str)
+    parser.add_argument('--export_onnx', action='store_true')
     return parser.parse_args()
 
 
@@ -183,6 +184,51 @@ def main(opt):
             trainer.test(model=pl_model, ckpt_path=glob.glob(f"{log_path}/trained_models/*.ckpt")[0],
                          dataloaders=dataloader_test)
 
+        if opt.export_onnx:
+            import onnxruntime as ort
+            input = dataset_train.__getitem__(0)[0][None, :]
+            model_path = glob.glob(f"{log_path}/trained_models/*.ckpt")[0]
+            onnx_model_path = model_path.replace('.ckpt','.onnx')
+
+            if model['type'] == 'cnn1d':
+                pl_model = CNN1D.load_from_checkpoint(checkpoint_path=model_path,
+                                                      learning_rate=learning_rate,
+                                                      log_path=log_path,
+                                                      patience=int(epochs / 10))
+            elif model['type'] == 'ghostnet':
+                pl_model = GhostNet.load_from_checkpoint(checkpoint_path=model_path,
+                                                         cfgs=model['ghostnet']['stages'],
+                                                         width=model['ghostnet']['width'],
+                                                         learning_rate=learning_rate,
+                                                         log_path=log_path,
+                                                         patience=int(epochs / 5))
+            elif model['type'] == 'transformer':
+                pl_model = ViT.load_from_checkpoint(checkpoint_path=model_path,
+                                                    embed_dim=model['transformer']['embed_dim'],
+                                                    hidden_dim=model['transformer']['hidden_dim'],
+                                                    num_heads=model['transformer']['num_heads'],
+                                                    num_layers=model['transformer']['num_layers'],
+                                                    patch_size=model['transformer']['patch_size'],
+                                                    num_channels=model['transformer']['num_channels'],
+                                                    num_patches=model['transformer']['num_patches'],
+                                                    num_classes=model['transformer']['num_classes'],
+                                                    dropout=model['transformer']['dropout'],
+                                                    learning_rate=learning_rate, log_path=log_path)
+
+            pl_model.eval()
+            pred_data = pl_model(input)
+
+            torch.onnx.export(pl_model, input, onnx_model_path, export_params=True, opset_version=10,
+                              do_constant_folding=True, input_names=['input'],
+                              output_names=['output'],
+                              dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}})
+
+            ort_session = ort.InferenceSession(onnx_model_path)
+            ort_inputs = {ort_session.get_inputs()[0].name: input.detach().numpy()}
+            ort_outs = ort_session.run(None, ort_inputs)
+
+            torch.testing.assert_allclose(pred_data[0].detach().numpy(), ort_outs[0], rtol=1e-03, atol=1e-05)
+            torch.testing.assert_allclose(pred_data[1].detach().numpy(), ort_outs[1], rtol=1e-03, atol=1e-05)
 
 if __name__ == "__main__":
     _args = parse_opt()
