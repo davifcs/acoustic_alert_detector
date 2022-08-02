@@ -105,6 +105,8 @@ class BaseDataset(Dataset):
             if isinstance(signal, list):
                 for i, s in enumerate(signal):
                     signal[i] = self._img_to_patch(s, self.patch_size)
+            else:
+                signal = self._img_to_patch(signal, self.patch_size)
         return signal
 
 
