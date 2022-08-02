@@ -8,21 +8,20 @@ import pandas as pd
 import torchaudio
 from torch.nn import functional as F
 
-import soundfile as sf
+#import soundfile as sf
 
 SEED = 42
 random.seed(SEED)
 
 
 class BaseDataset(Dataset):
-    def __init__(self, train, transforms, target_sr, target_size, model, patch_size, mixup):
+    def __init__(self, train, transforms, target_sr, target_size, model, mixup):
         super().__init__()
         self.train = train
         self.transforms = transforms
         self.target_sr = target_sr
         self.target_size = int(target_size * target_sr)
         self.model = model
-        self.patch_size = patch_size
         self.mixup = mixup
 
     def _map_target_classes(self, map_class_to_id):
@@ -51,7 +50,7 @@ class BaseDataset(Dataset):
                 break
         return cropped_signal
 
-    def _img_to_patch(self, signal, patch_size):
+    def _img_to_patch(self, signal, patch_size=4):
         b, h, w = signal.shape
 
         signal = signal.reshape(h // patch_size, patch_size, w // patch_size, patch_size)
@@ -104,16 +103,16 @@ class BaseDataset(Dataset):
         if self.model == 'transformer':
             if isinstance(signal, list):
                 for i, s in enumerate(signal):
-                    signal[i] = self._img_to_patch(s, self.patch_size)
+                    signal[i] = self._img_to_patch(s)
             else:
-                signal = self._img_to_patch(signal, self.patch_size)
+                signal = self._img_to_patch(signal)
         return signal
 
 
 class ESC50(BaseDataset):
-    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model, patch_size,
+    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model,
                  mixup=False):
-        super().__init__(train, transforms, target_sr, target_size, model, patch_size, mixup)
+        super().__init__(train, transforms, target_sr, target_size, model, mixup)
         self.annotations = pd.read_csv(annotations_file)
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
         self.annotations.reset_index(drop=True, inplace=True)
@@ -142,9 +141,9 @@ class ESC50(BaseDataset):
 
 
 class UrbanSound8K(BaseDataset):
-    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model, patch_size,
+    def __init__(self, train, annotations_file, audio_dir, folds, transforms, target_sr, target_size, model,
                  mixup=False):
-        super().__init__(train, transforms, target_sr, target_size, model, patch_size, mixup)
+        super().__init__(train, transforms, target_sr, target_size, model, mixup)
         self.annotations = pd.read_csv(annotations_file)
         self.annotations.rename(columns={"class": "category", "classID": "target"}, inplace=True)
         self.annotations = self.annotations[self.annotations.fold.isin(folds)]
@@ -176,9 +175,9 @@ class UrbanSound8K(BaseDataset):
 
 
 class AudioSet(BaseDataset):
-    def __init__(self, train, annotations_file, audio_dir, transforms, target_sr, target_size, model, patch_size,
+    def __init__(self, train, annotations_file, audio_dir, transforms, target_sr, target_size, model,
                  mixup):
-        super().__init__(train, transforms, target_sr, target_size, model, patch_size, mixup)
+        super().__init__(train, transforms, target_sr, target_size, model, mixup)
         self.annotations = pd.read_csv(annotations_file, delimiter=',', names=list(range(10)), dtype=object)
         self.annotations.reset_index(drop=True, inplace=True)
         self.audio_dir = audio_dir
@@ -231,6 +230,5 @@ if __name__ == "__main__":
                         target_sr=22050,
                         target_size=1,
                         model='cnn',
-                        patch_size=4,
                         mixup=True)
 
