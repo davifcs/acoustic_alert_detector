@@ -12,7 +12,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import utils.dataset
 from utils.general import increment_path
 from utils.dataset import ESC50, UrbanSound8K, AudioSet
-from models.convolutional import DSCNN, CNN2D, CNN1D
+from models.convolutional import CNN1D
 from models.transformer import ViT
 from models.ghostnet import GhostNet
 
@@ -21,8 +21,8 @@ seed_everything(SEED)
 torch.manual_seed(SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed(SEED)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 warnings.filterwarnings("ignore", ".*Consider increasing the value of the `num_workers` argument*")
 
@@ -92,7 +92,6 @@ def main(opt):
                                 target_sr=target_sr,
                                 target_size=target_size,
                                 model=model['type'],
-                                patch_size=model['transformer']['patch_size'],
                                 mixup=datasets['mixup'])
 
     for fold in datasets[datasets['main']]['folds']:
@@ -106,7 +105,6 @@ def main(opt):
                                        target_sr=target_sr,
                                        target_size=target_size,
                                        model=model['type'],
-                                       patch_size=model['transformer']['patch_size'],
                                        mixup=datasets['mixup'])
             dataset_test = ESC50(train=False,
                                  annotations_file=datasets['esc50']['annotations_file'],
@@ -115,8 +113,7 @@ def main(opt):
                                  transforms=transforms,
                                  target_sr=target_sr,
                                  target_size=target_size,
-                                 model=model['type'],
-                                 patch_size=model['transformer']['patch_size'])
+                                 model=model['type'])
         elif datasets['main'] == 'urbansound8k':
             main_dataset_train = UrbanSound8K(train=True,
                                               annotations_file=datasets['urbansound8k']['annotations_file'],
@@ -127,7 +124,6 @@ def main(opt):
                                               target_sr=target_sr,
                                               target_size=target_size,
                                               model=model['type'],
-                                              patch_size=model['transformer']['patch_size'],
                                               mixup=datasets['mixup'])
             dataset_test = UrbanSound8K(train=False,
                                         annotations_file=datasets['urbansound8k']['annotations_file'],
@@ -136,8 +132,7 @@ def main(opt):
                                         transforms=transforms,
                                         target_sr=target_sr,
                                         target_size=target_size,
-                                        model=model['type'],
-                                        patch_size=model['transformer']['patch_size'])
+                                        model=model['type'])
 
         dataset_train = ConcatDataset([main_dataset_train, audioset_dataset])
 
@@ -153,42 +148,11 @@ def main(opt):
         dataloader_test = DataLoader(dataset=dataset_test, drop_last=True, num_workers=workers,
                                      collate_fn=utils.dataset.collate_fn, persistent_workers=True)
 
-        if model['type'] == 'convolutional':
-            if model['cnn']['dim'] == 2 and model['cnn']['deepwise_separable']:
-                pl_model = DSCNN(learning_rate=learning_rate, log_path=log_path, patience=int(epochs/10))
-            elif model['cnn']['dim'] == 2:
-                pl_model = CNN2D(learning_rate=learning_rate, log_path=log_path, patience=int(epochs/10))
-            elif model['cnn']['dim'] == 1:
-                pl_model = CNN1D(learning_rate=learning_rate, log_path=log_path, patience=int(epochs/10))
+        if model['type'] == 'cnn1d':
+            pl_model = CNN1D(learning_rate=learning_rate, log_path=log_path, patience=int(epochs/10))
         elif model['type'] == 'ghostnet':
-            cfgs = [
-                # k, t, c, SE, s
-                # stage1
-                [[3, 16, 16, 0, 1]],
-                # stage2
-                [[3, 48, 24, 0, 2]],
-                [[3, 72, 24, 0, 1]],
-                # stage3
-                [[5, 72, 40, 0.25, 2]],
-                [[5, 120, 40, 0.25, 1]],
-                # stage4
-                [[3, 240, 80, 0, 2]],
-                [[3, 200, 80, 0, 1],
-                 [3, 184, 80, 0, 1],
-                 [3, 184, 80, 0, 1],
-                 [3, 480, 112, 0.25, 1],
-                 [3, 672, 112, 0.25, 1]
-                 ],
-                # stage5
-                [[5, 672, 160, 0.25, 2]],
-                [[5, 960, 160, 0, 1],
-                 [5, 960, 160, 0.25, 1],
-                 [5, 960, 160, 0, 1],
-                 [5, 960, 160, 0.25, 1]
-                 ]
-            ]
-            pl_model = GhostNet(cfgs, width=0.2, learning_rate=learning_rate, log_path=log_path, patience=int(epochs/5))
-
+            pl_model = GhostNet(model['ghostnet']['stages'], width=model['ghostnet']['width'],
+                                learning_rate=learning_rate, log_path=log_path, patience=int(epochs/5))
         elif model['type'] == 'transformer':
             pl_model = ViT(embed_dim=model['transformer']['embed_dim'], hidden_dim=model['transformer']['hidden_dim'],
                            num_heads=model['transformer']['num_heads'], num_layers=model['transformer']['num_layers'],
@@ -197,7 +161,6 @@ def main(opt):
                            num_patches=model['transformer']['num_patches'],
                            num_classes=model['transformer']['num_classes'], dropout=model['transformer']['dropout'],
                            learning_rate=learning_rate, log_path=log_path)
-
         pl_model.to(device)
 
         if not opt.pre_trained_exp_path:

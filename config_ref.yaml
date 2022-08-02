@@ -1,10 +1,33 @@
 gpus: 1 # number of gpus
 workers: 0 # number of cpu threads
 model:
-  type: "ghostnet"
-  cnn:
-    dim: 1
-    deepwise_separable: None
+  type: "ghostnet" # "ghostnet, cnn1d, transformer"
+  ghostnet:
+    width: 0.2
+    stages: [
+      # k, t, c, SE, s
+      # stage1
+      [[3, 16, 16, 0, 1]],
+      # stage2
+      [[3, 48, 24, 0, 2]],
+      [[3, 72, 24, 0, 1]],
+      # stage3
+      [[5, 72, 40, 0.25, 2]],
+      [[5, 120, 40, 0.25, 1]],
+      # stage4
+      [[3, 240, 80, 0, 2]],
+      [[3, 200, 80, 0, 1],
+       [3, 184, 80, 0, 1],
+       [3, 184, 80, 0, 1],
+       [3, 480, 112, 0.25, 1],
+       [3, 672, 112, 0.25, 1]],
+      # stage5
+      [[5, 672, 160, 0.25, 2]],
+      [[5, 960, 160, 0, 1],
+       [5, 960, 160, 0.25, 1],
+       [5, 960, 160, 0, 1],
+       [5, 960, 160, 0.25, 1]]
+    ]
   transformer:
     embed_dim: 16
     hidden_dim: 32

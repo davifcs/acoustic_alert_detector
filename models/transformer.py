@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torchmetrics.functional import f1_score, accuracy
 from pytorch_lightning import LightningModule
+from torchvision.ops.focal_loss import sigmoid_focal_loss
 from sklearn.metrics import confusion_matrix, classification_report
 
 
@@ -46,7 +47,7 @@ class ViT(LightningModule):
         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
         self.pos_embedding = nn.Parameter(torch.randn(1, 1 + num_patches, embed_dim))
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = sigmoid_focal_loss
         self.learning_rate = learning_rate
         self.log_path = log_path
 
@@ -78,15 +79,18 @@ class ViT(LightningModule):
     def training_step(self, batch, batch_idx):
         x, y = batch
         logits, preds = self.forward(x)
-        loss = self.criterion(logits, y)
+        loss = self.criterion(logits, y, reduction='mean')
         self.log('train_loss', loss.item(), prog_bar=True)
         return loss
 
     def evaluate(self, batch, stage=None):
         x, y = batch
         logits, preds = self.forward(x)
-        loss = self.criterion(logits, y)
-        acc = accuracy(preds, y)
+        if stage == 'test':
+            logits = logits.mean(dim=0).reshape(-1, 2)
+            preds = torch.argmax(logits, dim=1)
+        loss = self.criterion(logits, y, reduction='mean')
+        acc = accuracy(preds, y.argmax(dim=1))
 
         if stage:
             self.log(f'{stage}_acc', acc.item(), prog_bar=True)
@@ -102,7 +106,7 @@ class ViT(LightningModule):
 
     def test_epoch_end(self, outputs):
         preds = torch.cat([output['predictions'] for output in outputs])
-        labels = torch.cat([output['label'] for output in outputs])
+        labels = torch.cat([output['label'] for output in outputs]).argmax(dim=1)
         f1 = f1_score(preds, labels, average='macro', num_classes=2)
 
         report = classification_report(labels.cpu(), preds.cpu())

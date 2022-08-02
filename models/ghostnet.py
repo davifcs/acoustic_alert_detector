@@ -1,12 +1,10 @@
-import torch.nn.functional as F
 import math
-
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torchmetrics.functional import f1_score, accuracy
 from pytorch_lightning import LightningModule
 from torchvision.ops.focal_loss import sigmoid_focal_loss
-
 from sklearn.metrics import confusion_matrix, classification_report
 
 
@@ -262,37 +260,3 @@ class GhostNet(LightningModule):
             f.write('Confusion Matrix \n' + str(cm))
 
         self.log(f'test_f1', f1.item(), prog_bar=True)
-
-
-def ghostnet(**kwargs):
-    """
-    Constructs a GhostNet model
-    """
-    cfgs = [
-        # k, t, c, SE, s
-        # stage1
-        [[3, 16, 16, 0, 1]],
-        # stage2
-        [[3, 48, 24, 0, 2]],
-        [[3, 72, 24, 0, 1]],
-        # stage3
-        [[5, 72, 40, 0.25, 2]],
-        [[5, 120, 40, 0.25, 1]],
-        # stage4
-        [[3, 240, 80, 0, 2]],
-        [[3, 200, 80, 0, 1],
-         [3, 184, 80, 0, 1],
-         [3, 184, 80, 0, 1],
-         [3, 480, 112, 0.25, 1],
-         [3, 672, 112, 0.25, 1]
-         ],
-        # stage5
-        [[5, 672, 160, 0.25, 2]],
-        [[5, 960, 160, 0, 1],
-         [5, 960, 160, 0.25, 1],
-         [5, 960, 160, 0, 1],
-         [5, 960, 160, 0.25, 1]
-         ]
-    ]
-    return GhostNet(cfgs, learning_rate=1e-3, log_path='./', patience=20, width=0.1, **kwargs)
-
