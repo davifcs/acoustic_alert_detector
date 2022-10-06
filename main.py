@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore", ".*Consider increasing the value of the `num_w
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--yaml_file', type=str, default='./config.yaml')
+    parser.add_argument('--yaml_file', type=str, default='config.yaml')
     parser.add_argument('--pre_trained_exp_path', type=str)
     parser.add_argument('--export_onnx', action='store_true')
     return parser.parse_args()
@@ -144,7 +144,7 @@ def main(opt):
 
         dataloader_train = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers,
                                       persistent_workers=True)
-        dataloader_val = DataLoader(dataset=dataset_train, batch_size=batch_size, drop_last=True, num_workers=workers,
+        dataloader_val = DataLoader(dataset=dataset_val, batch_size=batch_size, drop_last=True, num_workers=workers,
                                     persistent_workers=True)
         dataloader_test = DataLoader(dataset=dataset_test, drop_last=True, num_workers=workers,
                                      collate_fn=utils.dataset.collate_fn, persistent_workers=True)
@@ -229,6 +229,7 @@ def main(opt):
 
             torch.testing.assert_allclose(pred_data[0].detach().numpy(), ort_outs[0], rtol=1e-03, atol=1e-05)
             torch.testing.assert_allclose(pred_data[1].detach().numpy(), ort_outs[1], rtol=1e-03, atol=1e-05)
+
 
 if __name__ == "__main__":
     _args = parse_opt()

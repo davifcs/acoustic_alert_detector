@@ -1,0 +1,54 @@
+gpus: 1
+workers: 2
+model:
+  type: cnn1d
+learning_rate: 0.001
+weight_decay: 0
+epochs: 200
+batch_size: 64
+datasets:
+  mixup: true
+  main: esc50
+  audioset:
+    annotations_file: ./data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv
+    audio_dir: ./data/AudioSet/balanced_train_segments/
+  esc50:
+    annotations_file: ./data/ESC-50-master/meta/esc50.csv
+    audio_dir: ./data/ESC-50-master/audio/
+    folds:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  urbansound8k:
+    annotations_file: ./data/UrbanSound8K/metadata/UrbanSound8K.csv
+    audio_dir: ./data/UrbanSound8K/audio/
+    folds:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 1
+    - 2
+runs_dir: ./runs/exp
+target_size: 1
+target_sr: 8820
+transforms:
+  type: ''
+  mel_spectrogram:
+    n_fft: 1024
+    hop_length: 512
+    n_mels: 32
+    power: 2
+    center: false
+    normalized: False,
+    mel_scale: slaney
+  mfcc:
+    n_mfcc: 32
+    dct_type: 2
+    norm: ortho

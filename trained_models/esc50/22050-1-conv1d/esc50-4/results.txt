@@ -1,0 +1,12 @@
+              precision    recall  f1-score   support
+
+           0       0.99      0.99      0.99       392
+           1       0.60      0.75      0.67         8
+
+    accuracy                           0.98       400
+   macro avg       0.80      0.87      0.83       400
+weighted avg       0.99      0.98      0.99       400
+
+Confusion Matrix 
+[[388   4]
+ [  2   6]]

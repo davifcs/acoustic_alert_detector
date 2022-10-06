@@ -1,0 +1,80 @@
+gpus: 1
+workers: 2
+model:
+  type: "ghostnet" # "ghostnet, cnn1d, transformer"
+  ghostnet:
+    width: 0.2
+    stages: [
+      # k, t, c, SE, s
+      # stage1
+      [[3, 16, 16, 0, 1]],
+      # stage2
+      [[3, 48, 24, 0, 2]],
+      [[3, 72, 24, 0, 1]],
+      # stage3
+      [[5, 72, 40, 0.25, 2]],
+      [[5, 120, 40, 0.25, 1]],
+      # stage4
+      [[3, 240, 80, 0, 2]],
+      [[3, 200, 80, 0, 1],
+       [3, 184, 80, 0, 1],
+       [3, 184, 80, 0, 1],
+       [3, 480, 112, 0.25, 1],
+       [3, 672, 112, 0.25, 1]],
+      # stage5
+      [[5, 672, 160, 0.25, 2]],
+      [[5, 960, 160, 0, 1],
+       [5, 960, 160, 0.25, 1],
+       [5, 960, 160, 0, 1],
+       [5, 960, 160, 0.25, 1]]
+    ]
+learning_rate: 0.01
+weight_decay: 0
+epochs: 200
+batch_size: 64
+datasets:
+  mixup: true
+  main: esc50
+  audioset:
+    annotations_file: ./data/AudioSet/balanced_train_segments/filtered_balanced_train_segments.csv
+    audio_dir: ./data/AudioSet/balanced_train_segments/
+  esc50:
+    annotations_file: ./data/ESC-50-master/meta/esc50.csv
+    audio_dir: ./data/ESC-50-master/audio/
+    folds:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  urbansound8k:
+    annotations_file: ./data/UrbanSound8K/metadata/UrbanSound8K.csv
+    audio_dir: ./data/UrbanSound8K/audio/
+    folds:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 1
+    - 2
+    - 3
+runs_dir: ./runs/exp
+target_size: 1.5
+target_sr: 8820
+transforms:
+  type: mel_spectrogram
+  mel_spectrogram:
+    n_fft: 1024
+    hop_length: 512
+    n_mels: 64
+    power: 2
+    center: false
+    normalized: False,
+    mel_scale: slaney
+  mfcc:
+    n_mfcc: 64
+    dct_type: 2
+    norm: ortho

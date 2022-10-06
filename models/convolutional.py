@@ -82,6 +82,7 @@ class CNN1D(CNN):
         self.linear = nn.Sequential(
             nn.Flatten(),
             nn.Linear(128 * 16, 64),
+            # nn.Linear(64 * 9, 64),
             nn.ReLU(),
             nn.Linear(64, 2),
         )
