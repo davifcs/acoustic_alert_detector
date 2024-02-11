@@ -137,7 +137,7 @@ class ESC50(BaseDataset):
             eye = torch.eye(2)
             label = eye[label]
         signal = self._pre_processing(signal)
-        return signal, label
+        return signal, label, audio_sample_path
 
 
 class UrbanSound8K(BaseDataset):
@@ -171,7 +171,7 @@ class UrbanSound8K(BaseDataset):
             eye = torch.eye(2)
             label = eye[label]
         signal = self._pre_processing(signal)
-        return signal, label
+        return signal, label, audio_sample_path
 
 
 class AudioSet(BaseDataset):
@@ -212,19 +212,19 @@ def build_weighted_random_sampler(targets):
 
 
 def collate_fn(batch):
-    x, y = batch[0]
+    x, y, path = batch[0]
     if len(x.shape) < 3:
         x = x.reshape(x.shape[0], 1, x.shape[1])
     else:
         x = x.reshape(x.shape[0], 1, x.shape[1], x.shape[2])
-    return x, y.reshape(-1, 2)
+    return x, y.reshape(-1, 2), path
 
 
 if __name__ == "__main__":
-    esc50_dataset = ESC50(
+    esc50_dataset = UrbanSound8K(
                         train=False,
-                        annotations_file='../data/ESC-50-master/meta/esc50.csv',
-                        audio_dir='../data/ESC-50-master/audio/',
+                        annotations_file='../data/UrbanSound8K/metadata/UrbanSound8K_siren.csv',
+                        audio_dir='../data/UrbanSound8K/audio/',
                         folds=[1, 2],
                         transforms=None,
                         target_sr=22050,
